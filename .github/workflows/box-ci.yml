@@ -1,0 +1,102 @@
+name: Validate Box Configs and Services
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'box/**'
+      - '.github/workflows/box-ci.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'box/**'
+      - '.github/workflows/box-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  lint_box:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends shellcheck php-cli python3-flask yamllint sudo
+
+      - name: Lint shell scripts with shellcheck
+        run: |
+          shellcheck box/scripts/*.sh box/configs/*.sh box/src/admin/*.sh box/src/admin/hooks/*.sh
+
+      - name: Compile-check Python modules
+        run: |
+          python3 -m py_compile box/src/internal_api/app.py box/src/admin/maintenance.py box/src/admin/status_helper.py
+
+      - name: Syntax-check PHP application
+        run: |
+          php -l box/src/web/index.php
+
+      - name: Validate Netplan YAML syntax
+        run: |
+          yamllint -d relaxed box/configs/01-netcfg.yaml
+
+      - name: Validate sudoers policy syntax
+        run: |
+          sudo visudo -cf box/configs/90-dev-admin.sudoers
+
+  e2e_services:
+    needs: lint_box
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install service runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3-flask php-cli curl
+
+      - name: Run E2E HTTP probes against Flask and PHP services
+        run: |
+          set -euo pipefail
+          export VULNBOX_CONFIG="$PWD/box/src/internal_api/config.ini"
+          export VULNBOX_AUTH_KEYS_FILE="/tmp/vulnbox_ci_authorized_keys"
+          rm -f "$VULNBOX_AUTH_KEYS_FILE"
+          python3 box/src/internal_api/app.py >/tmp/flask.log 2>&1 &
+          FLASK_PID=$!
+          php -S 127.0.0.1:8080 -t box/src/web >/tmp/php.log 2>&1 &
+          PHP_PID=$!
+          trap 'kill "$FLASK_PID" "$PHP_PID" 2>/dev/null || true' EXIT
+
+          READY=0
+          for _ in $(seq 1 15); do
+            if curl -fsS http://127.0.0.1:5000/health >/dev/null 2>&1 && curl -fsS http://127.0.0.1:8080/ >/dev/null 2>&1; then
+              READY=1
+              break
+            fi
+            sleep 1
+          done
+          test "$READY" -eq 1
+
+          curl -fsS http://127.0.0.1:5000/health | python3 -c "import sys, json; d = json.load(sys.stdin); assert d['status'] == 'ok'"
+          curl -fsS "http://127.0.0.1:8080/?module=status" | grep -q 'VulnBox'
+          curl -fsS "http://127.0.0.1:8080/?proxy_path=/api/v1/info&token=vb-internal-9f8e7d6c5b4a3f2e1d0c" | grep -q 'vulnbox-internal-api'
+          curl -fsS -X POST "http://127.0.0.1:8080/?proxy_path=/api/v1/ssh-key&token=vb-internal-9f8e7d6c5b4a3f2e1d0c" \
+            --data-urlencode "ssh_key=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey lab@vulnbox" | grep -q 'registered'
+          grep -q 'AAAAC3NzaC1lZDI1NTE5AAAAITestKey' "$VULNBOX_AUTH_KEYS_FILE"
+          python3 box/src/admin/maintenance.py | grep -q 'VulnBox'
+          bash box/src/admin/backup_check.sh

@@ -1,0 +1,52 @@
+% Pakiety w ustalonej kolejności (hyperref ładowany jest osobno w preamble/links.tex).
+
+% --- Język, kodowanie, czcionki, typografia ---
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[polish]{babel}
+\let\lll\undefined             % babel (polish) definiuje \lll, co koliduje z amssymb
+\usepackage{csquotes}
+\usepackage{indentfirst}
+\usepackage{microtype}
+\frenchspacing
+
+% --- Matematyka ---
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{mathtools}
+
+% --- Kolory, grafika, obiekty pływające ---
+\usepackage[table, svgnames]{xcolor}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+
+% --- Tabele ---
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{makecell}
+
+% --- Listy, listingi, algorytmy, PDF ---
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage[ruled, vlined, linesnumbered, longend, algochapter]{algorithm2e}
+\usepackage{pdfpages}
+\usepackage{multicol}
+\usepackage{pifont}
+
+% --- Układ strony, nagłówki, stopki ---
+\usepackage[a4paper, top=25mm, bottom=25mm, left=25mm, right=25mm,
+            headheight=30pt, headsep=12pt]{geometry}
+\makeatletter
+\if@twoside
+  \geometry{bindingoffset=5mm}
+\fi
+\makeatother
+\usepackage{fancyhdr}
+\usepackage{titlesec}

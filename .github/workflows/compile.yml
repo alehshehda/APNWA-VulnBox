@@ -1,0 +1,113 @@
+name: Build and Release PDF
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build_latex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Compile LaTeX document
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: report
+          root_file: main.tex
+          args: -pdf -bibtex -interaction=nonstopmode -halt-on-error
+
+      - name: Rename and verify PDF
+        run: |
+          mv report/main.pdf APNWA-VulnBox.pdf
+          test -s APNWA-VulnBox.pdf
+
+      - name: Prepare GitHub Pages site
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          mkdir -p _site
+          cp APNWA-VulnBox.pdf _site/
+          cat << 'EOF' > _site/index.html
+          <!DOCTYPE html>
+          <html lang="pl">
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0; url=APNWA-VulnBox.pdf">
+            <title>APNWA-VulnBox - PDF</title>
+          </head>
+          <body>
+            <p>Redirecting to <a href="APNWA-VulnBox.pdf">APNWA-VulnBox.pdf</a>...</p>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Upload PDF artifact
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-pdf
+          path: APNWA-VulnBox.pdf
+          retention-days: 7
+
+  deploy_pages:
+    needs: build_latex
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  release:
+    needs: build_latex
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download PDF artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: compiled-pdf
+
+      - name: Create or update latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          if gh release view latest --repo "$REPO" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$REPO/git/refs/tags/latest" -f sha="$GITHUB_SHA" -F force=true >/dev/null
+            while IFS= read -r asset; do
+              [ -n "$asset" ] && gh release delete-asset latest "$asset" --yes --repo "$REPO"
+            done < <(gh release view latest --repo "$REPO" --json assets --jq '.assets[].name | select(endswith(".pdf") and . != "APNWA-VulnBox.pdf")')
+            gh release upload latest APNWA-VulnBox.pdf --clobber --repo "$REPO"
+          else
+            gh release create latest APNWA-VulnBox.pdf --target "$GITHUB_SHA" --title "Latest Compiled PDF" --notes "Automated LaTeX build." --repo "$REPO"
+          fi

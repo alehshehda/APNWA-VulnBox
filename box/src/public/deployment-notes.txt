@@ -1,0 +1,18 @@
+========================================================================
+VulnBox - Internal Deployment Notes (Draft v1.2)
+========================================================================
+Host:              vulnbox
+Service Account:   dev
+Web Portal (:8080): /index.php?module=status
+Diagnostics View:   /index.php?module=diag
+                    (parameters: log=<filename>, diag_host=<host>)
+
+Internal Services:
+- Loopback Flask API binds strictly to 127.0.0.1:5000 (systemd: flask-internal)
+- Service configuration and API token stored in:
+  /opt/internal_api/config.ini
+- Scheduled maintenance scripts located in /opt/admin/
+
+Reminder:
+Remove this draft file from /srv/samba/public before production handover.
+========================================================================

@@ -1,0 +1,50 @@
+% !tikz-libs: arrows.meta,positioning,calc
+\begin{tikzpicture}[
+    every node/.style={font=\sffamily\small, text=acadInk}
+]
+
+    % Actors (5 columns with extra width on first span)
+    \node[seqactor, minimum width=2.8cm] (a1) at (0, 0) {
+        \textbf{Analityk}\\{\scriptsize Host (\texttt{vboxnet0})}
+    };
+    \node[seqactor, minimum width=2.8cm] (a2) at (4.6, 0) {
+        \textbf{Samba / SSH}\\{\scriptsize \texttt{:445}, \texttt{:22/tcp}}
+    };
+    \node[seqactor, minimum width=2.8cm] (a3) at (8.6, 0) {
+        \textbf{Portal WWW}\\{\scriptsize \texttt{:8080} (\texttt{www-data})}
+    };
+    \node[seqactor, minimum width=2.8cm] (a4) at (12.4, 0) {
+        \textbf{Flask API}\\{\scriptsize \texttt{127.0.0.1:5000}}
+    };
+    \node[seqactor, minimum width=2.8cm] (a5) at (16.0, 0) {
+        \textbf{Cron / Sudo}\\{\scriptsize Kontekst \texttt{root}}
+    };
+
+    % Lifelines
+    \draw[lifeline] (a1.south) -- (0, -9.8);
+    \draw[lifeline] (a2.south) -- (4.6, -9.8);
+    \draw[lifeline] (a3.south) -- (8.6, -9.8);
+    \draw[lifeline] (a4.south) -- (12.4, -9.8);
+    \draw[lifeline] (a5.south) -- (16.0, -9.8);
+
+    % 1. SMB enumeration
+    \draw[flow] (0, -1.2) -- node[flowlabel, above=2pt] {\scriptsize \textbf{1.} Pobranie \texttt{deployment-notes.txt}} (4.6, -1.2);
+    \draw[ctrl] (4.6, -2.0) -- node[flowlabel, above=2pt] {\scriptsize Ścieżki \texttt{/var/www} i \texttt{/opt/internal\_api}} (0, -2.0);
+
+    % 2. Web portal path traversal
+    \draw[flow] (0, -2.9) -- node[flowlabel, above=2pt] {\scriptsize \textbf{2.} \texttt{GET /?log=....//....//opt/internal\_api/config.ini}} (8.6, -2.9);
+    \draw[ctrl] (8.6, -3.7) -- node[flowlabel, above=2pt] {\scriptsize Zwrot wartości \texttt{api\_token} (\texttt{X-Internal-Token})} (0, -3.7);
+
+    % 3. Loopback API proxy to register SSH key
+    \draw[flow] (0, -4.6) -- node[flowlabel, above=2pt] {\scriptsize \textbf{3.} \texttt{POST /?proxy\_path=/api/v1/ssh-key} (token + klucz SSH)} (8.6, -4.6);
+    \draw[flow] (8.6, -5.4) -- node[flowlabel, above=2pt] {\scriptsize Żądanie do \texttt{127.0.0.1:5000}} (12.4, -5.4);
+    \draw[ctrl] (12.4, -6.2) -- node[flowlabel, above=2pt] {\scriptsize Zapis klucza w \texttt{/home/dev/.ssh/authorized\_keys}} (4.6, -6.2);
+
+    % 4. SSH login as dev
+    \draw[flow] (0, -7.1) -- node[flowlabel, above=2pt] {\scriptsize \textbf{4.} Sesja SSH (\texttt{dev}), odczyt \texttt{user.txt}} (4.6, -7.1);
+
+    % 5. Administrative privilege elevation (cron / sudoers)
+    \draw[flow] (4.6, -8.1) -- node[flowlabel, above=2pt] {\scriptsize \textbf{5.} Wykonanie \texttt{pre\_backup.sh} (\texttt{cron}) / \texttt{maintenance.py} (\texttt{sudo})} (16.0, -8.1);
+    \draw[ctrl] (16.0, -9.0) -- node[flowlabel, above=2pt] {\scriptsize Weryfikacja kontekstu \texttt{uid=0(root)} i odczyt \texttt{/root/root.txt}} (0, -9.0);
+
+\end{tikzpicture}

@@ -1,0 +1,30 @@
+% Polskie etykiety dokumentu i słowa kluczowe dla algorithm2e.
+
+% Wyłączenie aktywnego znaku " z pakietu babel-polish (zapobiega błędom przy "tekst" w węzłach i grupach {})
+\AtBeginDocument{\shorthandoff{"}}
+
+\newcommand{\abbrevname}{Spis skrótów}
+
+\addto\captionspolish{%
+  \renewcommand{\contentsname}{Spis treści}%
+  \renewcommand{\listfigurename}{Spis rysunków}%
+  \renewcommand{\listtablename}{Spis tabel}%
+  \renewcommand{\lstlistlistingname}{Spis listingów}%
+  \renewcommand{\chaptername}{Rozdział}%
+  \renewcommand{\appendixname}{Załącznik}%
+  \renewcommand{\bibname}{Bibliografia}%
+  \renewcommand{\refname}{Bibliografia}%
+  \renewcommand{\figurename}{Rysunek}%
+  \renewcommand{\tablename}{Tabela}%
+  \renewcommand{\lstlistingname}{Listing}%
+  \renewcommand{\proofname}{Dowód}%
+}
+
+\SetAlgorithmName{Algorytm}{algorytm}{Spis algorytmów}
+
+\SetKwInOut{Input}{Dane wejściowe}
+\SetKwInOut{Output}{Wynik}
+\SetKwIF{If}{ElseIf}{Else}{jeżeli}{to}{w przeciwnym razie, jeżeli}{w przeciwnym razie}{koniec warunku}
+\SetKwFor{For}{dla}{wykonaj}{koniec pętli}
+\SetKwFor{While}{dopóki}{wykonuj}{koniec pętli}
+\SetKw{Return}{zwróć}

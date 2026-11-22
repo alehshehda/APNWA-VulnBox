@@ -1,0 +1,48 @@
+% Konfiguracja dokumentu i przełączniki sekcji
+
+% --- Jednostka i logo (puste pole ukrywa element) ---
+\newcommand{\University}{Politechnika Wrocławska}
+\newcommand{\Faculty}{Wydział Informatyki i Telekomunikacji}
+\newcommand{\LogoFile}{logos/logoPWr.png}
+
+% --- Tytuł i przedmiot ---
+\newcommand{\DocType}{Dokumentacja projektowa}
+\newcommand{\DocTitle}{Konfigurowanie i weryfikacja podatnej maszyny wirtualnej VulnBox}
+\newcommand{\Course}{Cyberbezpieczeństwo}
+\newcommand{\Subject}{Zaawansowane Testy Penetracyjne Sieci i Aplikacji Web}
+\newcommand{\ShortSubject}{} % opcjonalny skrót nazwy przedmiotu do stopki (puste = używa \Subject)
+\newcommand{\GroupInfo}{Grupa nr 1 / czwartek, godz. 11:15 - 14:00}
+
+% --- Autorzy i prowadzący (kolejne linie rozdzielaj przez \\; puste \Supervisor ukrywa blok) ---
+\newcommand{\AuthorsLabel}{Autorzy}
+\newcommand{\Authors}{%
+    Aleh Shehda, nr albumu 272277\\
+    Aliaksei Lapachuk, nr albumu 276711\\
+    Karyna Zahorskaya, nr albumu 272302\\
+}
+
+\newcommand{\SupervisorLabel}{Prowadzący}
+\newcommand{\Supervisor}{%
+    mgr inż. Bartłomiej Balcerek\\
+}
+
+% --- Miejscowość, data, skrót SHA-256 i metadane PDF ---
+\newcommand{\PlaceDate}{Wrocław, \today}
+\newcommand{\DocumentHash}{4d765532542ad27ee8332d18c750238d7d4ec295ca117fb7aeca216a0339bdf0}
+\newcommand{\PdfAuthor}{Aleh Shehda, Aliaksei Lapachuk, Karyna Zahorskaya}
+
+% --- Przełączniki części opcjonalnych (\...true = pokaż, \...false = ukryj) ---
+\newif\ifshowabstract         \showabstractfalse
+\newif\ifshowabbreviations    \showabbreviationsfalse
+\newif\ifshowbibliography     \showbibliographytrue
+\newif\ifshowlistoffigures    \showlistoffigurestrue
+\newif\ifshowlistoftables     \showlistoftablestrue
+\newif\ifshowlistoflistings   \showlistoflistingstrue
+\newif\ifshowlistofalgorithms \showlistofalgorithmsfalse
+\newif\ifshowappendices       \showappendicesfalse
+
+% Wersja do druku (\printversiontrue wyłącza kolorowe odnośniki w PDF)
+\newif\ifprintversion         \printversionfalse
+
+% Domyślne pozycjonowanie rysunków \Figure (H lub htbp)
+\newcommand{\DefaultFigurePlacement}{H}

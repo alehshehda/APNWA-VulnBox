@@ -1,0 +1,46 @@
+% Style listingów: terminal (domyślny) i code.
+
+\lstset{
+  inputencoding=utf8,
+  extendedchars=true,
+  literate=
+    {ą}{{\k{a}}}1 {ć}{{\'c}}1 {ę}{{\k{e}}}1 {ł}{{\l{}}}1 {ń}{{\'n}}1
+    {ó}{{\'o}}1 {ś}{{\'s}}1 {ź}{{\'z}}1 {ż}{{\.z}}1
+    {Ą}{{\k{A}}}1 {Ć}{{\'C}}1 {Ę}{{\k{E}}}1 {Ł}{{\L{}}}1 {Ń}{{\'N}}1
+    {Ó}{{\'O}}1 {Ś}{{\'S}}1 {Ź}{{\'Z}}1 {Ż}{{\.Z}}1
+}
+
+\lstdefinestyle{base}{
+  basicstyle=\ttfamily\footnotesize,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  rulecolor=\color{lgray},
+  breaklines=true,
+  postbreak=\mbox{\textcolor{dgray}{$\hookrightarrow$}\space},
+  showstringspaces=false,
+  captionpos=t,
+  aboveskip=1em,
+  belowskip=1em,
+}
+
+\lstdefinestyle{terminal}{
+  style=base,
+  backgroundcolor=\color{gray!6},
+}
+
+\lstdefinestyle{code}{
+  style=base,
+  numbers=left,
+  numberstyle=\tiny\color{dgray},
+  numbersep=6pt,
+  xleftmargin=1.6em,
+  framexleftmargin=1.6em,
+  keywordstyle=\bfseries\color{Accent},
+  commentstyle=\itshape\color{dgray},
+  stringstyle=\color{DarkGreen},
+}
+
+\lstset{style=terminal}
+
+\AtBeginDocument{\counterwithin{lstlisting}{chapter}}

@@ -1,0 +1,67 @@
+% !tikz-libs: arrows.meta,positioning,calc,shapes.multipart,fit,backgrounds
+\begin{tikzpicture}[
+    every node/.style={font=\sffamily\small, text=acadInk}
+]
+
+    % Top Row (Left to Right): 0-knowledge -> Stage 1 (SMB) -> Stage 2 (Web)
+    \node[block, minimum width=3.8cm, minimum height=2.1cm, text width=3.4cm, align=center] (s0) at (0, 0) {
+        \textbf{Stan początkowy}\\[3pt]
+        {\scriptsize Poziom \texttt{0-knowledge}}\\[2pt]
+        {\scriptsize Dostęp wyłącznie do sieci \texttt{vboxnet0}}
+    };
+
+    \node[splitcard, minimum width=4.4cm, text width=4.0cm] (s1) at (6.3, 0) {
+        \textbf{Etap 1: Usługa SMB (\texttt{:445})}
+        \nodepart{second}
+        {\scriptsize Kontekst: \texttt{nobody}}\\[-1pt]
+        {\scriptsize Zasób gościnny \texttt{[public]}}\\[-1pt]
+        {\scriptsize Odczyt notatek wdrożeniowych}
+    };
+    \node[step, anchor=north west] at ([xshift=-6pt, yshift=6pt]s1.north west) {1};
+
+    \node[splitcard, minimum width=4.5cm, text width=4.1cm] (s2) at (12.9, 0) {
+        \textbf{Etap 2: Portal WWW (\texttt{:8080})}
+        \nodepart{second}
+        {\scriptsize Kontekst: \texttt{www-data}}\\[-1pt]
+        {\scriptsize Niepełna filtracja ścieżek (\texttt{?log=})}\\[-1pt]
+        {\scriptsize Odczyt tokenu z \texttt{config.ini}}
+    };
+    \node[step, anchor=north west] at ([xshift=-6pt, yshift=6pt]s2.north west) {2};
+
+    % Bottom Row (Right to Left): Stage 3 (Loopback API) -> Stage 4 (User dev) -> Stage 5 (Root)
+    \node[splitcard_accent, minimum width=4.5cm, text width=4.1cm] (s3) at (12.9, -4.1) {
+        \textbf{Etap 3: API lokalne (\texttt{:5000})}
+        \nodepart{second}
+        {\scriptsize Kontekst: \texttt{127.0.0.1} (\texttt{User=dev})}\\[-1pt]
+        {\scriptsize Autoryzacja \texttt{X-Internal-Token}}\\[-1pt]
+        {\scriptsize Zapis klucza do \texttt{authorized\_keys}}
+    };
+    \node[step, anchor=north west] at ([xshift=-6pt, yshift=6pt]s3.north west) {3};
+
+    \node[splitcard, minimum width=4.4cm, text width=4.0cm] (s4) at (6.3, -4.1) {
+        \textbf{Etap 4: Konto lokalne (\texttt{dev})}
+        \nodepart{second}
+        {\scriptsize Kontekst: \texttt{uid=1001(dev)}}\\[-1pt]
+        {\scriptsize Logowanie SSH (\texttt{:22/tcp})}\\[-1pt]
+        {\scriptsize Odczyt flagi \texttt{/home/dev/user.txt}}
+    };
+    \node[step, anchor=north west] at ([xshift=-6pt, yshift=6pt]s4.north west) {4};
+
+    \node[splitcard_accent, minimum width=3.8cm, text width=3.4cm] (s5) at (0, -4.1) {
+        \textbf{Etap 5: Konto \texttt{root}}
+        \nodepart{second}
+        {\scriptsize Kontekst: \texttt{uid=0(root)}}\\[-1pt]
+        {\scriptsize Ścieżka A: skrypt \texttt{cron}}\\[-1pt]
+        {\scriptsize Ścieżka B: reguła \texttt{sudoers.d}}\\[-1pt]
+        {\scriptsize Odczyt \texttt{/root/root.txt}}
+    };
+    \node[step, anchor=north west] at ([xshift=-6pt, yshift=6pt]s5.north west) {5};
+
+    % Transitions with generous gap clearance
+    \draw[flow] (s0.east) -- node[flowlabel, above=4pt] {\scriptsize Enumeracja} (s1.west);
+    \draw[flow] (s1.east) -- node[flowlabel, above=4pt] {\scriptsize Ścieżki plików} (s2.west);
+    \draw[flow] (s2.south) -- node[flowlabel, right=5pt] {\scriptsize Mostek \texttt{loopback}} (s3.north);
+    \draw[flow] (s3.west) -- node[flowlabel, above=4pt] {\scriptsize Klucz SSH} (s4.east);
+    \draw[flow] (s4.west) -- node[flowlabel, above=4pt] {\scriptsize \texttt{cron} / \texttt{sudo}} (s5.east);
+
+\end{tikzpicture}

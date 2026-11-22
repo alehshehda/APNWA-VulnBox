@@ -1,0 +1,53 @@
+# Auxiliary and output files for LaTeX / BibTeX / latexmk
+*.aux
+*.bbl
+*.blg
+*.bcf
+*.dvi
+*.fdb_latexmk
+*.fls
+*.glo
+*.gls
+*.glg
+*.idx
+*.ilg
+*.ind
+*.ist
+*.loa
+*.lof
+*.log
+*.lol
+*.lot
+*.nav
+*.out
+*.ps
+*.run.xml
+*.snm
+*.synctex
+*.synctex.gz
+*.synctex(busy)
+*.thm
+*.toc
+*.vrb
+*.xdv
+
+# Compiled PDFs in root and report/ (do not ignore vector icons in report/images/icons/)
+/*.pdf
+/report/*.pdf
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# VirtualBox local VM images and snapshots
+*.ova
+*.vdi
+*.vmdk
+*.vbox
+*.vbox-prev
+
+# OS and backup temporary files
+.DS_Store
+Thumbs.db
+*.bak
+*~

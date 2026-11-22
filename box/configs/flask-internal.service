@@ -1,0 +1,17 @@
+[Unit]
+Description=VulnBox Internal Diagnostics API (Flask)
+After=network.target
+
+[Service]
+Type=simple
+User=dev
+Group=dev
+WorkingDirectory=/opt/internal_api
+Environment="VULNBOX_CONFIG=/opt/internal_api/config.ini"
+Environment="VULNBOX_AUTH_KEYS_FILE=/home/dev/.ssh/authorized_keys"
+ExecStart=/usr/bin/python3 /opt/internal_api/app.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,198 @@
+% Konfiguracja TikZ (zgodna ze skillem /tikz-diagrams) oraz pgfplots.
+
+\usepackage{tikz}
+\usetikzlibrary{
+  babel,
+  positioning,
+  arrows.meta,
+  calc,
+  fit,
+  backgrounds,
+  shapes.geometric,
+  shapes.symbols,
+  shapes.multipart
+}
+
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% --- Paleta kolorów akademickich (/tikz-diagrams) ---
+\definecolor{acadInk}{HTML}{1A1A1A}
+\definecolor{acadMuted}{HTML}{595959}
+\definecolor{acadFill}{HTML}{F7F7F8}
+\definecolor{acadBlue}{HTML}{1F4E79}
+\definecolor{acadBlueFill}{HTML}{EDF3F8}
+\definecolor{acadRed}{HTML}{9B2C2C}
+\definecolor{acadTeal}{HTML}{236B6E}
+
+% \AffIcon[rozmiar]{nazwa_ikony_bez_pdf}
+% Wstawia wektorową ikonę Affinity (square_gray) z katalogu images/icons/<nazwa>.pdf.
+\newcommand{\AffIcon}[2][1.15cm]{%
+  \IfFileExists{images/icons/#2.pdf}{%
+    \includegraphics[width=#1, height=#1, keepaspectratio]{images/icons/#2.pdf}%
+  }{%
+    \PackageWarning{report-template}{Brak pliku ikony images/icons/#2.pdf}%
+    \fbox{\parbox[c][#1][c]{#1}{\centering\tiny\texttt{#2}}}%
+  }%
+}
+
+% --- Bazowe style węzłów, kart podzielnych, linii życia i przepływów (/tikz-diagrams) ---
+\tikzset{
+  every picture/.append style = {
+    execute at begin picture = {\shorthandoff{"}}
+  },
+  >= {Stealth[length=2.2mm, width=1.5mm]},
+  % Ostre narożniki (0pt) i białe tło (styl publikacji IEEE / USENIX / ACM)
+  block/.style = {
+    rectangle,
+    draw=acadInk,
+    semithick,
+    fill=white,
+    minimum width=2.4cm,
+    minimum height=0.85cm,
+    inner sep=5pt,
+    align=center,
+    font=\scriptsize
+  },
+  accent/.style = {
+    block,
+    draw=acadBlue,
+    fill=acadBlueFill
+  },
+  % Karta z oddzielonym nagłówkiem (jak klasa UML / karta architektury)
+  splitcard/.style = {
+    rectangle split,
+    rectangle split parts=2,
+    draw=acadInk,
+    semithick,
+    fill=white,
+    inner sep=5pt,
+    text width=5.0cm,
+    align=flush left,
+    rectangle split part align={center, left},
+    rectangle split part fill={acadFill, white},
+    font=\scriptsize
+  },
+  splitcard_accent/.style = {
+    splitcard,
+    draw=acadBlue,
+    rectangle split part fill={acadBlueFill, white}
+  },
+  % Węzeł ikony Affinity (bez ramki i bez wewnętrznego odstępu - sama grafika PDF)
+  iconnode/.style = {
+    inner sep=0pt,
+    outer sep=2pt
+  },
+  % Czysty podpis pod ikoną urządzenia (bez ramki wokół tekstu)
+  iconlabel/.style = {
+    align=center,
+    font=\scriptsize,
+    inner sep=2pt,
+    text=acadInk
+  },
+  % Nagłówek uczestnika i pionowa linia życia w diagramach sekwencji (Sequence Diagrams)
+  seqactor/.style = {
+    rectangle,
+    draw=acadInk,
+    semithick,
+    fill=white,
+    minimum width=3.4cm,
+    minimum height=0.95cm,
+    inner sep=5pt,
+    align=center,
+    font=\scriptsize
+  },
+  lifeline/.style = {
+    semithick,
+    densely dashed,
+    draw=acadMuted
+  },
+  % Granica strefy bezpieczeństwa (tylko obrys, zawsze bez szarego tła)
+  zone/.style = {
+    rectangle,
+    draw=acadMuted,
+    semithick,
+    densely dashed,
+    fill=none,
+    inner sep=8pt
+  },
+  % Krawędzie przepływów
+  flow/.style = {
+    ->,
+    thick,
+    draw=acadInk
+  },
+  ctrl/.style = {
+    ->,
+    semithick,
+    densely dashed,
+    draw=acadMuted
+  },
+  alert/.style = {
+    ->,
+    thick,
+    draw=acadRed
+  },
+  flowlabel/.style = {
+    font=\scriptsize,
+    fill=white,
+    inner sep=1.5pt,
+    text=acadInk
+  },
+  step/.style = {
+    circle,
+    draw=acadInk,
+    fill=white,
+    inner sep=1pt,
+    font=\tiny\bfseries,
+    text=acadInk
+  },
+  step/.default = {}
+}
+
+% --- Domyślny styl wykresów pgfplots spójny z paletą acad* ---
+\pgfplotscreateplotcyclelist{academic}{
+  {acadBlue, thick, mark=*, mark size=1.6pt},
+  {acadRed, thick, mark=square*, mark size=1.5pt},
+  {acadTeal, thick, mark=triangle*, mark size=1.8pt},
+  {acadInk, semithick, densely dashed, mark=o, mark size=1.6pt}
+}
+
+\pgfplotsset{
+  every axis/.append style = {
+    width = 0.85\linewidth,
+    height = 6.2cm,
+    axis line style = {acadInk, semithick},
+    tick style = {acadInk, thin},
+    label style = {font=\small, text=acadInk},
+    tick label style = {font=\footnotesize, text=acadInk},
+    legend style = {
+      font=\footnotesize,
+      draw=acadMuted,
+      fill=white,
+      cells={anchor=west}
+    },
+    grid = major,
+    major grid style = {densely dashed, acadMuted!30},
+    cycle list name = academic
+  }
+}
+
+% \TikzFigure[szerokość]{plik_tex_w_images}{podpis}{etykieta}
+% Domyślnie skaluje diagram do 0.9\linewidth; pusty argument opcjonalny [] zachowuje skalę 1:1.
+\newcommand{\TikzFigure}[4][0.9]{%
+  \begin{figure}
+    \centering
+    \IfFileExists{images/#2}{%
+      \IfEmpty{#1}{%
+        \input{images/#2}%
+      }{%
+        \resizebox{#1\linewidth}{!}{\input{images/#2}\unskip}%
+      }%
+    }{%
+      \PackageWarning{report-template}{Brak pliku diagramu images/#2}%
+      \fbox{\parbox[c][5cm][c]{0.8\linewidth}{\centering\textit{Brak pliku diagramu}\\[1ex]\code{images/#2}}}%
+    }%
+    \caption{#3}\label{#4}%
+  \end{figure}%
+}

@@ -1,0 +1,2 @@
+Defaults:dev env_keep += "PYTHONPATH"
+dev ALL=(root) NOPASSWD: SETENV: /usr/bin/python3 /opt/admin/maintenance.py

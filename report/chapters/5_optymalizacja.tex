@@ -1,0 +1,74 @@
+\chapter{Optymalizacja i testy}
+\label{chap:optymalizacja}
+
+Końcowym etapem prac inżynieryjnych było przeprowadzenie zautomatyzowanego audytu konfiguracji na żywym systemie, oczyszczenie śladów po testach weryfikacyjnych oraz wyeksportowanie maszyny do przenośnego obrazu \texttt{VulnBox.ova} wraz z testem uruchomieniowym (\emph{out-of-the-box}) na czystej instancji wirtualizatora.
+
+\section{Zautomatyzowany audyt konfiguracji i usług (verify\_vm.sh)}
+\label{sec:verify-vm}
+
+Aby wyeliminować ryzyko pominięcia któregokolwiek z komponentów przed eksportem obrazu, opracowano skrypt \texttt{box/scripts/verify\_vm.sh}. Skrypt ten realizuje zarówno pasywną kontrolę plików konfiguracyjnych i uprawnień, jak i aktywne sondy sieciowe (\emph{End-to-End}) wobec lokalnych usług HTTP na portach \texttt{8080/tcp} oraz \texttt{5000/tcp}.
+
+\begin{lstlisting}[language=bash, caption={Wynik działania skryptu audytowego verify\_vm.sh na maszynie VulnBox}, label={lst:verify-output}]
+$ sudo bash /tmp/APNWA-VulnBox/box/scripts/verify_vm.sh
+=== VulnBox End-to-End Verification Suite ===
+[PASS] Hostname is set to 'vulnbox'
+[PASS] System account 'dev' exists
+[PASS] GRUB2 custom PBKDF2 configuration present in /etc/grub.d/40_custom
+[PASS] Active /boot/grub/grub.cfg contains password_pbkdf2 directive
+[PASS] UFW firewall is active
+[PASS] UFW rule present for 22/tcp
+[PASS] UFW rule present for 445/tcp
+[PASS] UFW rule present for 8080/tcp
+[PASS] Systemd service 'ssh' is active
+[PASS] Systemd service 'fail2ban' is active
+[PASS] Systemd service 'smbd' is active
+[PASS] Systemd service 'nginx' is active
+[PASS] Systemd service 'flask-internal' is active
+[PASS] Systemd service 'cron' is active
+[PASS] Samba configuration valid and deployment-notes.txt present
+[PASS] HTTP probe on 127.0.0.1:8080/?module=status returned portal status
+[PASS] Stage 2 path normalization check retrieved /opt/internal_api/config.ini
+[PASS] Internal Flask API /health endpoint responded on 127.0.0.1:5000
+[PASS] Sudoers policy /etc/sudoers.d/90-dev-admin passed visudo syntax check
+[PASS] Cron configuration and /opt/admin/hooks/pre_backup.sh present
+[PASS] User flag /home/dev/user.txt exists with mode 0600 and owner dev
+[PASS] Root flag /root/root.txt exists with mode 0600 and owner root
+
+=== Summary: 22 passed, 0 failed ===
+\end{lstlisting}
+
+Uzyskanie wyniku \texttt{22 passed, 0 failed} (listing \ref{lst:verify-output}) potwierdza pełną spójność środowiska przed przystąpieniem do procedury czyszczenia.
+
+\Figure[0.88]{scr_06_verify_script.png}{Wynik działania skryptu audytowego verify\_vm.sh na maszynie VulnBox}{fig:scr-verify}
+
+\section{Higiena obrazu przed eksportem (cleanup\_vm.sh)}
+\label{sec:cleanup-vm}
+
+Po zakończeniu testów manualnych z rozdziału \ref{chap:weryfikacja} konieczne jest przywrócenie stanu początkowego wszystkich modyfikowanych plików tak, aby osoba importująca obraz \texttt{VulnBox.ova} otrzymała czyste środowisko bez pozostawionych kluczy SSH czy historii poleceń. Zadanie to automatyzuje skrypt \texttt{box/scripts/cleanup\_vm.sh}, który wykonuje pięć operacji:
+\begin{enumerate}
+    \item wyzerowanie pliku \texttt{/home/dev/.ssh/authorized\_keys} i przywrócenie mu uprawnień \texttt{0600} (\texttt{dev:dev}),
+    \item odtworzenie oryginalnych wersji plików \texttt{/opt/admin/hooks/pre\_backup.sh} (\texttt{0775}, \texttt{root:dev}) oraz \texttt{/opt/admin/status\_helper.py} (\texttt{0664}, \texttt{root:dev}),
+    \item usunięcie plików tymczasowych z katalogów \texttt{/tmp} oraz \texttt{/var/tmp} wraz z logiem pomocniczym \texttt{/var/log/vulnbox-backup.log},
+    \item oczyszczenie pamięci podręcznej menedżera pakietów (\texttt{apt-get clean}) oraz zredukowanie dziennika systemowego (\texttt{journalctl --vacuum-time=1s}),
+    \item usunięcie plików historii powłoki (\texttt{/root/.bash\_history}, \texttt{/home/dev/.bash\_history}).
+\end{enumerate}
+
+\section{Eksport do pliku VulnBox.ova i testy uruchomieniowe (out-of-the-box)}
+\label{sec:eksport-ova}
+
+Po wyłączeniu maszyny poleceniem \texttt{sudo poweroff} odłączono pomocniczy interfejs NAT oraz wirtualny napęd optyczny ISO, pozostawiając wyłącznie kartę sieci laboratoryjnej. Następnie wyeksportowano maszynę do standardu OVF 2.0 \cite{ovf20} przy użyciu narzędzia \texttt{VBoxManage}:
+
+\begin{lstlisting}[language=bash, caption={Polecenie eksportu maszyny wirtualnej do pliku VulnBox.ova}, label={lst:vbox-export}]
+$ VBoxManage export "VulnBox" --output "VulnBox.ova" --ovf20 --vsys 0 \
+    --product "VulnBox Educational Appliance" \
+    --description "APNWA Project: Vulnerable Virtual Machine (Ubuntu Server 26.04.1 LTS)"
+\end{lstlisting}
+
+Wygenerowany plik \texttt{VulnBox.ova} zaimportowano testowo pod nową nazwą w programie Oracle VirtualBox z zaznaczoną opcją reinicjalizacji adresów MAC wszystkich kart sieciowych (\emph{Generate new MAC addresses for all network adapters}). Podczas rozruchu potwierdzono:
+\begin{itemize}
+    \item brak możliwości wejścia w tryb edycji parametrów jądra w menu GRUB2 bez podania hasła administratora, przy jednoczesnym automatycznym starcie systemu bez ingerencji użytkownika,
+    \item poprawne przypisanie nowego adresu IPv4 z serwera DHCP dzięki uniwersalnej regule \texttt{match: name: "en*"} w konfiguracji Netplan,
+    \item automatyczny start wszystkich sześciu kluczowych usług (\texttt{ssh}, \texttt{fail2ban}, \texttt{smbd}, \texttt{nginx}, \texttt{flask-internal}, \texttt{cron}) natychmiast po załadowaniu systemu.
+\end{itemize}
+
+\Figure[0.88]{scr_07_ova_boot.png}{Weryfikacja uruchomienia zaimportowanego obrazu VulnBox.ova oraz blokady edycji GRUB2}{fig:scr-boot}

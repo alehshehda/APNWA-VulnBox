@@ -1,0 +1,80 @@
+% Szkielet dokumentu. Kompilacja: pdfLaTeX + BibTeX (plik główny: main.tex).
+% Dla druku dwustronnego zamień "oneside" na "twoside".
+\documentclass[12pt, a4paper, oneside, openany]{book}
+
+% --- Konfiguracja i preambuła ---
+\input{config/metadata}
+\input{preamble/packages}
+\input{config/theme-pwr}
+\input{preamble/polish}
+\input{preamble/macros}
+\input{preamble/floats-and-tables}
+\input{preamble/tikz}
+\input{preamble/listings}
+\input{preamble/headings}
+\input{preamble/pagestyles}
+\input{preamble/links}
+
+\begin{document}
+
+% --- Część wstępna ---
+\frontmatter
+\assignpagestyle{\chapter}{frontstyle}
+\pagestyle{frontstyle}
+
+\hypersetup{pageanchor=false}
+\input{frontmatter/titlepage}
+\hypersetup{pageanchor=true}
+\ifshowabstract
+    \input{frontmatter/abstract}
+\fi
+
+\clearpage\phantomsection
+\tableofcontents
+
+\ifshowabbreviations
+    \input{frontmatter/abbreviations}
+\fi
+
+% --- Treść główna ---
+\mainmatter
+\assignpagestyle{\chapter}{chapterfirst}
+\pagestyle{mainstyle}
+
+\input{chapters/1_wstep}
+\input{chapters/2_architektura}
+\input{chapters/3_konfiguracja}
+\input{chapters/4_weryfikacja}
+\input{chapters/5_optymalizacja}
+\input{chapters/6_podsumowanie}
+
+% --- Bibliografia i spisy ---
+\ifshowbibliography
+    \clearpage\phantomsection
+    \pagestyle{bibstyle}
+    \addcontentsline{toc}{chapter}{\bibname}
+    \bibliographystyle{bib/plabbrv-fixed}
+    \bibliography{bib/references}
+\fi
+
+\ifshowlistoffigures
+    \BackList{lofstyle}{\listfigurename}{\listoffigures}
+\fi
+\ifshowlistoftables
+    \BackList{lotstyle}{\listtablename}{\listoftables}
+\fi
+\ifshowlistoflistings
+    \BackList{lolstyle}{\lstlistlistingname}{\lstlistoflistings}
+\fi
+\ifshowlistofalgorithms
+    \BackList{loastyle}{\listalgorithmcfname}{\listofalgorithms}
+\fi
+
+% --- Załączniki ---
+\ifshowappendices
+    \StartAppendices
+    \pagestyle{mainstyle}
+    \input{appendices/A_przykladowy}
+\fi
+
+\end{document}

@@ -1,0 +1,52 @@
+\chapter{Wstęp}
+\label{chap:wstep}
+
+Przedmiotem niniejszej dokumentacji projektowej jest zaprojektowanie, wdrożenie oraz kompleksowa weryfikacja edukacyjnej maszyny wirtualnej o nazwie \textbf{VulnBox}, przygotowanej w ramach kursu \emph{Zaawansowane Testy Penetracyjne Sieci i Aplikacji Web}. Głównym założeniem projektu jest zbudowanie deterministycznego, izolowanego środowiska laboratoryjnego opartego na systemie operacyjnym \textbf{Ubuntu Server 26.04.1 LTS} (w wariancie serwerowym pozbawionym graficznego interfejsu użytkownika) \cite{ubuntu2604}, które demonstruje wieloetapowy łańcuch błędów konfiguracyjnych prowadzący od braku wiedzy początkowej o systemie (\texttt{0-knowledge}) do pełnych uprawnień administracyjnych (\texttt{root}).
+
+\section{Cel i zakres projektu}
+\label{sec:cel-zakres}
+
+Projekt obejmuje zarówno warstwę inżynieryjną samej maszyny wirtualnej eksportowanej do formatu \texttt{VulnBox.ova} \cite{ovf20}, jak i zestaw zautomatyzowanych skryptów wdrożeniowych oraz audytowych utrzymywanych w repozytorium projektu. W odróżnieniu od losowych środowisk testowych architektura \texttt{VulnBox} została zaprojektowana tak, aby każdy etap weryfikacji wynikał bezpośrednio z błędów konfiguracji konkretnych usług systemowych lub aplikacyjnych, przy jednoczesnym zachowaniu pełnej odporności samego systemu bazowego na nieautoryzowane modyfikacje z poziomu konsoli wirtualizatora.
+
+W ramach realizacji projektu wyodrębniono następujące zadania szczegółowe:
+\begin{enumerate}
+    \item Przygotowanie bazowego obrazu systemu \textbf{Ubuntu Server 26.04.1 LTS} (\texttt{amd64}) w hiperwizorze Oracle VirtualBox pod nazwą \texttt{VulnBox} (nazwa hosta \texttt{vulnbox}).
+    \item Skonfigurowanie warstwy sieciowej z wykorzystaniem podsystemu \textbf{Netplan} \cite{netplan} w sposób zapewniający bezobsługowe pobieranie adresacji IP przez protokół DHCP niezależnie od identyfikatora karty sieciowej po imporcie pliku \texttt{VulnBox.ova}.
+    \item Zabezpieczenie programu rozruchowego \textbf{GRUB2} \cite{grub2} hasłem uwierzytelniającym opartym na algorytmie \texttt{PBKDF2-SHA512} przy zachowaniu automatycznego startu domyślnego jądra (\texttt{--unrestricted}) oraz wdrożenie ochrony brzegowej z użyciem zapory \textbf{UFW} \cite{ufw} i usługi \textbf{Fail2Ban} \cite{fail2ban}.
+    \item Wdrożenie czterowarstwowego łańcucha usług: zasobu plikowego \textbf{Samba} (\texttt{:445/tcp}) \cite{samba}, portalu diagnostycznego \textbf{Nginx + PHP-FPM} (\texttt{:8080/tcp}) \cite{nginx}, wewnętrznego serwisu \textbf{Flask API} (\texttt{127.0.0.1:5000}) \cite{flask} oraz mechanizmów administracyjnych (\texttt{cron} i \texttt{sudoers.d}) \cite{sudoers}.
+    \item Przeprowadzenie pełnej weryfikacji manualnej (\emph{End-to-End}) oraz automatycznej przy użyciu autorskiego skryptu audytowego \texttt{verify\_vm.sh}, połączonej z procedurą czyszczenia obrazu (\texttt{cleanup\_vm.sh}) przed eksportem do pliku \texttt{VulnBox.ova}.
+\end{enumerate}
+
+\section{Wymagania projektowe i założenia konstrukcyjne}
+\label{sec:wymagania-konstrukcyjne}
+
+W tabeli \ref{tab:wymagania-bazowe} zestawiono kluczowe wymagania obligatoryjne stawiane maszynie wirtualnej \texttt{VulnBox} wraz z przyjętym w projekcie sposobem ich technicznej realizacji.
+
+\begin{table}[H]
+    \centering
+    \caption{Zestawienie wymagań konstrukcyjnych dla maszyny wirtualnej VulnBox}
+    \label{tab:wymagania-bazowe}
+    \tablefont
+    \begin{tabularx}{\textwidth}{L{3.8cm} L{4.2cm} Y}
+        \toprule
+        \hcell{Obszar wymagań} & \hcell{Parametr docelowy} & \hcell{Zastosowane rozwiązanie techniczne} \\
+        \midrule
+        System operacyjny & Ubuntu Server 26.04.1 LTS (bez GUI) & Instalacja minimalna bez pakietów X11/Wayland, zarządzanie przez \texttt{systemd} \\
+        Wirtualizacja i eksport & Oracle VirtualBox, format \texttt{VulnBox.ova} & Standard OVF 2.0, pojedynczy adapter sieci izolowanej (\texttt{vboxnet0}) \\
+        Konfiguracja sieci & Automatyczne DHCP (\emph{out-of-the-box}) & Reguła Netplan dopasowująca interfejsy \texttt{en*}/\texttt{eth*} z \texttt{dhcp-identifier: mac} \\
+        Ochrona rozruchu & Blokada trybu \emph{Single User Mode} & Hasło \texttt{password\_pbkdf2} w \texttt{/etc/grub.d/40\_custom} i flaga \texttt{--unrestricted} \\
+        Ochrona brzegowa & Filtracja portów i blokada siłowa SSH & Zapora UFW (\texttt{deny incoming}, otwarte TCP 22, 445, 8080) oraz profil \texttt{sshd} w Fail2Ban \\
+        Ścieżka weryfikacji & Wielostopniowa (\texttt{0-knowledge} $\rightarrow$ \texttt{root}) & Łańcuch: Samba $\rightarrow$ Nginx/PHP $\rightarrow$ Flask Local API $\rightarrow$ konto \texttt{dev} $\rightarrow$ konto \texttt{root} \\
+        Znaczniki etapów & Flagi weryfikacyjne \texttt{user.txt} i \texttt{root.txt} & Pliki z uprawnieniami \texttt{0600} w katalogach \texttt{/home/dev/user.txt} oraz \texttt{/root/root.txt} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Struktura repozytorium projektowego}
+\label{sec:struktura-repo}
+
+Repozytorium projektu zostało podzielone na dwa odseparowane moduły funkcjonalne:
+\begin{itemize}
+    \item \texttt{report/} - źródła niniejszej dokumentacji projektowej w systemie \LaTeX{} wraz z wektorowymi diagramami TikZ (\texttt{report/images/}) kompilowane automatycznie w potoku CI/CD do pliku \texttt{APNWA-VulnBox.pdf},
+    \item \texttt{box/} - kompletny pakiet wdrożeniowy maszyny wirtualnej \texttt{VulnBox}, obejmujący dokumentację instalacyjną \texttt{box/SETUP.md}, pliki konfiguracyjne usług (\texttt{box/configs/}), kod źródłowy komponentów webowych i administracyjnych (\texttt{box/src/}) oraz skrypty automatyzujące budowę, weryfikację i czyszczenie systemu (\texttt{box/scripts/}).
+\end{itemize}
