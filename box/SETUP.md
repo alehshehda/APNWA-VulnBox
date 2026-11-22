@@ -45,13 +45,13 @@ Every step below corresponds directly to the actions automated in `box/scripts/p
 ```bash
 sudo hostnamectl set-hostname vulnbox
 sudo apt-get update
-sudo apt-get install -y ufw fail2ban samba smbclient nginx php-fpm php-cli \
-    python3 python3-flask openssh-server cron curl
+sudo apt-get install -y --no-install-recommends ufw fail2ban python3-systemd \
+    samba nginx php-fpm python3 python3-flask cron curl
 ```
 
 ### Step 3.2. User Account `dev` and Verification Flags
 
-Create the unprivileged `dev` account (with locked password so login requires SSH public-key authentication) and place the two stage verification files (`user.txt` and `root.txt`) with strict `0600` permissions:
+Create the unprivileged `dev` account (with locked password so login requires SSH public-key authentication) and place the two independent 32-character stage verification flags (`user.txt` and `root.txt`) with strict `0600` permissions:
 
 ```bash
 sudo useradd -m -s /bin/bash dev
@@ -59,22 +59,27 @@ sudo passwd -l dev
 sudo install -d -m 0700 -o dev -g dev /home/dev/.ssh
 sudo install -m 0600 -o dev -g dev /dev/null /home/dev/.ssh/authorized_keys
 
-printf 'FLAG{vulnbox_user_stage_verified_272277_276711_272302}\n' | sudo tee /home/dev/user.txt >/dev/null
+printf '%s\n' 'FLAG{Us3r_Sh3ll!7xK9#mP2@vQ4_d3v%8nR1}' | sudo tee /home/dev/user.txt >/dev/null
 sudo chown dev:dev /home/dev/user.txt
 sudo chmod 0600 /home/dev/user.txt
 
-printf 'FLAG{vulnbox_root_stage_verified_272277_276711_272302}\n' | sudo tee /root/root.txt >/dev/null
+printf '%s\n' 'FLAG{R00t_Pwn3d!9zW6@kL3#bT8_sys%4mX2}' | sudo tee /root/root.txt >/dev/null
 sudo chown root:root /root/root.txt
 sudo chmod 0600 /root/root.txt
 ```
 
 ### Step 3.3. Network Configuration (Netplan) and GRUB2 Protection
 
-Copy `box/configs/01-netcfg.yaml` to `/etc/netplan/01-netcfg.yaml` with `0600` permissions and apply the bootloader password policy from `box/configs/40_custom_grub`:
+Remove the installer Netplan file (which pins the original MAC address), copy `box/configs/01-netcfg.yaml` to `/etc/netplan/01-netcfg.yaml` with `0600` permissions, and apply the bootloader password policy with `--unrestricted` unattended boot and disabled recovery entries:
 
 ```bash
+sudo rm -f /etc/netplan/00-installer-config.yaml /etc/netplan/50-cloud-init.yaml
 sudo install -m 0600 -o root -g root box/configs/01-netcfg.yaml /etc/netplan/01-netcfg.yaml
+sudo netplan generate
+
 sudo install -m 0755 -o root -g root box/configs/40_custom_grub /etc/grub.d/40_custom
+sudo sed -i 's/^#*GRUB_DISABLE_RECOVERY=.*/GRUB_DISABLE_RECOVERY="true"/' /etc/default/grub
+sudo sed -i '/^CLASS="--class gnu-linux/ { /--unrestricted/! s/"$/ --unrestricted"/ }' /etc/grub.d/10_linux
 sudo update-grub
 ```
 
@@ -143,7 +148,8 @@ sudo visudo -cf /etc/sudoers.d/90-dev-admin
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now ssh fail2ban smbd nginx flask-internal cron
+sudo systemctl start ssh.socket
+sudo systemctl enable --now fail2ban smbd nginx flask-internal cron
 ```
 
 ---

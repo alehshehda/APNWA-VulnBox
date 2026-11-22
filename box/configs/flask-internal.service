@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 User=dev
 Group=dev
+SupplementaryGroups=www-data
 WorkingDirectory=/opt/internal_api
 Environment="VULNBOX_CONFIG=/opt/internal_api/config.ini"
 Environment="VULNBOX_AUTH_KEYS_FILE=/home/dev/.ssh/authorized_keys"

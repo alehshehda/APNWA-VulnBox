@@ -1,5 +1,5 @@
 [DEFAULT]
-bantime = 10m
+bantime = 15m
 findtime = 10m
 maxretry = 5
 backend = systemd
@@ -8,4 +8,3 @@ backend = systemd
 enabled = true
 port = 22
 filter = sshd
-logpath = %(sshd_log)s

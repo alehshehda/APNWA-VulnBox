@@ -3,14 +3,14 @@ declare(strict_types=1);
 
 /**
  * VulnBox Web Diagnostics & Log Inspection Portal (Port 8080)
- * Educational laboratory component for system configuration verification.
+ * Internal diagnostics dashboard and loopback management proxy.
  */
 
 header('Content-Type: text/plain; charset=utf-8');
 
 if (isset($_GET['log']) && $_GET['log'] !== '') {
     $rawLog = (string)$_GET['log'];
-    // Intentional single-pass path normalization weakness for educational analysis (CWE-22)
+    // Strip parent directory tokens before resolving log path
     $sanitizedLog = str_replace('../', '', $rawLog);
     $baseDir = '/var/log/webapp/';
     $targetPath = $baseDir . $sanitizedLog;

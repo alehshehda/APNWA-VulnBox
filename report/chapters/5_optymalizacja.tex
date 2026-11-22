@@ -13,13 +13,15 @@ $ sudo bash /tmp/APNWA-VulnBox/box/scripts/verify_vm.sh
 === VulnBox End-to-End Verification Suite ===
 [PASS] Hostname is set to 'vulnbox'
 [PASS] System account 'dev' exists
+[PASS] Netplan uses 01-netcfg.yaml (mode 0600) with no installer/cloud-init overrides
 [PASS] GRUB2 custom PBKDF2 configuration present in /etc/grub.d/40_custom
 [PASS] Active /boot/grub/grub.cfg contains password_pbkdf2 directive
+[PASS] Active /boot/grub/grub.cfg enables --unrestricted unattended boot
 [PASS] UFW firewall is active
 [PASS] UFW rule present for 22/tcp
 [PASS] UFW rule present for 445/tcp
 [PASS] UFW rule present for 8080/tcp
-[PASS] Systemd service 'ssh' is active
+[PASS] OpenSSH listener (ssh.socket / ssh.service) is active
 [PASS] Systemd service 'fail2ban' is active
 [PASS] Systemd service 'smbd' is active
 [PASS] Systemd service 'nginx' is active
@@ -29,28 +31,33 @@ $ sudo bash /tmp/APNWA-VulnBox/box/scripts/verify_vm.sh
 [PASS] HTTP probe on 127.0.0.1:8080/?module=status returned portal status
 [PASS] Stage 2 path normalization check retrieved /opt/internal_api/config.ini
 [PASS] Internal Flask API /health endpoint responded on 127.0.0.1:5000
+[PASS] Internal Flask API /api/v1/info authenticated using token from config.ini
 [PASS] Sudoers policy /etc/sudoers.d/90-dev-admin passed visudo syntax check
-[PASS] Cron configuration and /opt/admin/hooks/pre_backup.sh present
+[PASS] Cron configuration present and pre_backup.sh permissions are 0775 (root:dev)
+[PASS] Module /opt/admin/status_helper.py permissions are 0664 (root:dev)
 [PASS] User flag /home/dev/user.txt exists with mode 0600 and owner dev
 [PASS] Root flag /root/root.txt exists with mode 0600 and owner root
 
-=== Summary: 22 passed, 0 failed ===
+=== Summary: 26 passed, 0 failed ===
 \end{lstlisting}
 
-Uzyskanie wyniku \texttt{22 passed, 0 failed} (listing \ref{lst:verify-output}) potwierdza pełną spójność środowiska przed przystąpieniem do procedury czyszczenia.
+Uzyskanie wyniku \texttt{26 passed, 0 failed} (listing \ref{lst:verify-output}) potwierdza pełną spójność środowiska przed przystąpieniem do procedury czyszczenia.
 
 \Figure[0.88]{scr_06_verify_script.png}{Wynik działania skryptu audytowego verify\_vm.sh na maszynie VulnBox}{fig:scr-verify}
 
 \section{Higiena obrazu przed eksportem (cleanup\_vm.sh)}
 \label{sec:cleanup-vm}
 
-Po zakończeniu testów manualnych z rozdziału \ref{chap:weryfikacja} konieczne jest przywrócenie stanu początkowego wszystkich modyfikowanych plików tak, aby osoba importująca obraz \texttt{VulnBox.ova} otrzymała czyste środowisko bez pozostawionych kluczy SSH czy historii poleceń. Zadanie to automatyzuje skrypt \texttt{box/scripts/cleanup\_vm.sh}, który wykonuje pięć operacji:
+Po zakończeniu testów manualnych z rozdziału \ref{chap:weryfikacja} konieczne jest przywrócenie stanu początkowego wszystkich modyfikowanych plików tak, aby osoba importująca obraz \texttt{VulnBox.ova} otrzymała czyste środowisko bez pozostawionych kluczy SSH, logów testowych czy historii poleceń. Zadanie to automatyzuje skrypt \texttt{box/scripts/cleanup\_vm.sh}, który wykonuje osiem operacji:
 \begin{enumerate}
-    \item wyzerowanie pliku \texttt{/home/dev/.ssh/authorized\_keys} i przywrócenie mu uprawnień \texttt{0600} (\texttt{dev:dev}),
-    \item odtworzenie oryginalnych wersji plików \texttt{/opt/admin/hooks/pre\_backup.sh} (\texttt{0775}, \texttt{root:dev}) oraz \texttt{/opt/admin/status\_helper.py} (\texttt{0664}, \texttt{root:dev}),
-    \item usunięcie plików tymczasowych z katalogów \texttt{/tmp} oraz \texttt{/var/tmp} wraz z logiem pomocniczym \texttt{/var/log/vulnbox-backup.log},
-    \item oczyszczenie pamięci podręcznej menedżera pakietów (\texttt{apt-get clean}) oraz zredukowanie dziennika systemowego (\texttt{journalctl --vacuum-time=1s}),
-    \item usunięcie plików historii powłoki (\texttt{/root/.bash\_history}, \texttt{/home/dev/.bash\_history}).
+    \item zatrzymanie usług generujących logi (\texttt{cron}, \texttt{fail2ban}, \texttt{nginx}, \texttt{smbd}, \texttt{flask-internal}) na czas czyszczenia,
+    \item wyzerowanie pliku \path{/home/dev/.ssh/authorized_keys} i przywrócenie uprawnień \texttt{0600} (\texttt{dev:dev}),
+    \item odtworzenie oryginalnych wersji plików \path{/opt/admin/hooks/pre_backup.sh} (\texttt{0775}, \texttt{root:dev}) oraz \path{/opt/admin/status_helper.py} (\texttt{0664}, \texttt{root:dev}) wraz z usunięciem katalogów \texttt{\_\_pycache\_\_},
+    \item bezpieczne wyzerowanie aktywnych plików logów usług (\texttt{nginx}, \texttt{fail2ban}, \texttt{dpkg}, \texttt{wtmp}/\texttt{btmp}/\texttt{lastlog}) bez naruszania ich właścicieli oraz usunięcie plików w \path{/var/log/samba/}, \path{/var/log/apt/} i archiwów rotacyjnych,
+    \item usunięcie nieużywanych pakietów, pamięci podręcznej i list APT (\texttt{apt-get autoremove --purge}, \texttt{apt-get clean}, \path{/var/lib/apt/lists/*}) oraz zredukowanie dziennika \texttt{journalctl --vacuum-time=1s},
+    \item usunięcie plików historii powłoki i sesji (\texttt{.bash\_history}, \texttt{.lesshst}, \texttt{.viminfo}) dla konta \texttt{root} oraz wszystkich katalogów domowych w \path{/home/*},
+    \item wyczyszczenie katalogów tymczasowych \path{/tmp} i \path{/var/tmp},
+    \item wyzerowanie wolnego miejsca na partycji głównej (\texttt{dd if=/dev/zero}) z zachowaniem bufora bezpieczeństwa \texttt{1024 MB} oraz uruchomienie \texttt{fstrim} przed wyłączeniem maszyny w celu zmniejszenia rozmiaru eksportowanego pliku \texttt{VulnBox.ova}.
 \end{enumerate}
 
 \section{Eksport do pliku VulnBox.ova i testy uruchomieniowe (out-of-the-box)}

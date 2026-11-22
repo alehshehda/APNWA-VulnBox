@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 VulnBox administrative diagnostic runner.
-Authorized in /etc/sudoers.d/90-dev-admin for account 'dev' without password.
-Imports status_helper from the same directory (/opt/admin).
+Imports status_helper from /opt/admin to collect system health metadata.
 """
 
 import json

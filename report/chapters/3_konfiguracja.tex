@@ -65,7 +65,7 @@ password_pbkdf2 admin grub.pbkdf2.sha512.10000.9A4F2C8E1B7D3A6F...F6E5D4C.3F2E1D
 
 Polityka filtracji pakietów realizowana przez skrypt \texttt{box/configs/ufw-rules.sh} ustawia domyślną regułę odrzucania połączeń przychodzących (\texttt{ufw default deny incoming}) i zezwala wyłącznie na ruch TCP do trzech usług zewnętrznych: \texttt{22/tcp} (SSH), \texttt{445/tcp} (Samba) oraz \texttt{8080/tcp} (Nginx) \cite{ufw}. Dzięki temu port \texttt{5000/tcp} wewnętrznego serwisu Flask pozostaje całkowicie odizolowany od sieci \texttt{vboxnet0}.
 
-Równolegle usługa \textbf{Fail2Ban} (\texttt{/etc/fail2ban/jail.local}) monitoruje dziennik \texttt{/var/log/auth.log} dla demona \texttt{sshd}. Przekroczenie limitu \texttt{maxretry = 5} nieudanych prób uwierzytelnienia w oknie czasowym \texttt{findtime = 10m} skutkuje automatyczną blokadą adresu IP źródłowego na czas \texttt{bantime = 15m} \cite{fail2ban}.
+Równolegle usługa \textbf{Fail2Ban} (\texttt{/etc/fail2ban/jail.local}) monitoruje dziennik systemowy \texttt{systemd-journald} (\texttt{backend = systemd}) dla demona \texttt{sshd}. Przekroczenie limitu \texttt{maxretry = 5} nieudanych prób uwierzytelnienia w oknie czasowym \texttt{findtime = 10m} skutkuje automatyczną blokadą adresu IP źródłowego na czas \texttt{bantime = 15m} \cite{fail2ban}.
 
 \section{Etap 1: Konfiguracja usługi Samba i słabość ekspozycji metadanych}
 \label{sec:konfiguracja-samba}

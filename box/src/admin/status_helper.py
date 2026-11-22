@@ -1,6 +1,5 @@
 """
 VulnBox status helper module loaded by /opt/admin/maintenance.py.
-Group ownership in VM: root:dev (mode 0664) - intentionally writable by group 'dev'.
 """
 
 import platform

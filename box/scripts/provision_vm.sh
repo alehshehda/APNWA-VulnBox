@@ -13,24 +13,24 @@ BOX_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "[1/10] Configuring hostname 'vulnbox'..."
 hostnamectl set-hostname vulnbox || echo "vulnbox" > /etc/hostname
-if ! grep -q "vulnbox" /etc/hosts; then
+if grep -qE '^127\.0\.1\.1[[:space:]]' /etc/hosts; then
+    sed -i 's/^127\.0\.1\.1[[:space:]].*/127.0.1.1\tvulnbox/' /etc/hosts
+else
     printf '127.0.1.1\tvulnbox\n' >> /etc/hosts
 fi
 
-echo "[2/10] Installing required packages..."
+echo "[2/10] Installing required packages (minimal footprint)..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y \
+apt-get install -y --no-install-recommends \
     ufw \
     fail2ban \
+    python3-systemd \
     samba \
-    smbclient \
     nginx \
     php-fpm \
-    php-cli \
     python3 \
     python3-flask \
-    openssh-server \
     cron \
     curl
 
@@ -45,23 +45,21 @@ touch /home/dev/.ssh/authorized_keys
 chown dev:dev /home/dev/.ssh/authorized_keys
 chmod 0600 /home/dev/.ssh/authorized_keys
 
-if [ ! -f /home/dev/user.txt ]; then
-    printf 'FLAG{vulnbox_user_stage_verified_272277_276711_272302}\n' > /home/dev/user.txt
-fi
+printf '%s\n' 'FLAG{Us3r_Sh3ll!7xK9#mP2@vQ4_d3v%8nR1}' > /home/dev/user.txt
 chown dev:dev /home/dev/user.txt
 chmod 0600 /home/dev/user.txt
 
-if [ ! -f /root/root.txt ]; then
-    printf 'FLAG{vulnbox_root_stage_verified_272277_276711_272302}\n' > /root/root.txt
-fi
+printf '%s\n' 'FLAG{R00t_Pwn3d!9zW6@kL3#bT8_sys%4mX2}' > /root/root.txt
 chown root:root /root/root.txt
 chmod 0600 /root/root.txt
 
 echo "[4/10] Deploying Netplan and GRUB2 configurations..."
-if [ -d /etc/cloud/cloud.cfg.d ]; then
+if [ -d /etc/cloud/cloud.cfg.d ] \
+    && [ ! -f /etc/cloud/cloud-init.disabled ] \
+    && [ ! -f /etc/cloud/cloud.cfg.d/00-subiquity-disable-cloudinit-networking.cfg ]; then
     printf 'network: {config: disabled}\n' > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 fi
-rm -f /etc/netplan/50-cloud-init.yaml /etc/netplan/00-installer-config.yaml
+rm -f /etc/netplan/00-installer-config.yaml /etc/netplan/50-cloud-init.yaml
 install -m 0600 -o root -g root "${BOX_ROOT}/configs/01-netcfg.yaml" /etc/netplan/01-netcfg.yaml
 if command -v netplan >/dev/null 2>&1; then
     netplan generate || true
@@ -75,8 +73,8 @@ if [ -f /etc/default/grub ]; then
         printf 'GRUB_DISABLE_RECOVERY="true"\n' >> /etc/default/grub
     fi
 fi
-if [ -f /etc/grub.d/10_linux ] && ! grep -q -- '--unrestricted' /etc/grub.d/10_linux; then
-    sed -i 's/^CLASS="--class gnu-linux --class gnu --class os"/CLASS="--class gnu-linux --class gnu --class os --unrestricted"/' /etc/grub.d/10_linux
+if [ -f /etc/grub.d/10_linux ]; then
+    sed -i '/^CLASS="--class gnu-linux/ { /--unrestricted/! s/"$/ --unrestricted"/ }' /etc/grub.d/10_linux
 fi
 if command -v update-grub >/dev/null 2>&1; then
     update-grub || true
@@ -131,7 +129,14 @@ if [ -n "${PHP_FPM_UNIT}" ]; then
     systemctl restart "${PHP_FPM_UNIT}"
 fi
 
-for svc in ssh fail2ban smbd nginx flask-internal cron; do
+if systemctl is-enabled --quiet ssh.socket 2>/dev/null; then
+    systemctl start ssh.socket
+else
+    systemctl enable --now ssh
+    systemctl restart ssh
+fi
+
+for svc in fail2ban smbd nginx flask-internal cron; do
     systemctl enable --now "${svc}"
     systemctl restart "${svc}"
 done

