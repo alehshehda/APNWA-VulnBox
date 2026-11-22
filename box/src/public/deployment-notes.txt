@@ -3,9 +3,9 @@ VulnBox - Internal Deployment Notes (Draft v1.2)
 ========================================================================
 Host:              vulnbox
 Service Account:   dev
-Web Portal (:8080): /index.php?module=status
-Diagnostics View:   /index.php?module=diag
-                    (parameters: log=<filename>, diag_host=<host>)
+Web Portal (:8080): /var/www/vulnbox/index.php (?module=status)
+Diagnostics View:   /?log=<filename> (logs dir: /var/log/webapp/)
+Internal Bridge:    /?proxy_path=<endpoint>&token=<tok>
 
 Internal Services:
 - Loopback Flask API binds strictly to 127.0.0.1:5000 (systemd: flask-internal)

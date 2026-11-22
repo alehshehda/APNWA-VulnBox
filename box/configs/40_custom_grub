@@ -1,9 +1,7 @@
 #!/bin/sh
 exec tail -n +3 $0
 # GRUB2 bootloader protection template for /etc/grub.d/40_custom.
-# Replace <PBKDF2_HASH> with output from: grub-mkpasswd-pbkdf2
-# Also ensure /etc/grub.d/10_linux adds --unrestricted only to normal boot
-# menuentry items (leaving recovery / single-user entries locked).
+# You can regenerate the hash with: grub-mkpasswd-pbkdf2
 
 set superusers="admin"
-password_pbkdf2 admin <PBKDF2_HASH>
+password_pbkdf2 admin grub.pbkdf2.sha512.10000.48E259E540E02F32FB148D6DFB591E091C211A8E0148E114EC2A68B05AF952DA46D2B14A9FC10DAB80660DCCFB67A181A999D62BF14442AE7E8B6E3092981385.AB8BE46640062AFDF405E13F705ED5D471A9F8950A1F83E390249D199B7DEB0C4473152A59AB47E32A6C4CEC4AB4A32095A00FB8F45A8EDD27CE88E81E42C8EE

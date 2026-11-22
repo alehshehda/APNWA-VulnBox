@@ -58,8 +58,26 @@ chown root:root /root/root.txt
 chmod 0600 /root/root.txt
 
 echo "[4/10] Deploying Netplan and GRUB2 configurations..."
+if [ -d /etc/cloud/cloud.cfg.d ]; then
+    printf 'network: {config: disabled}\n' > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+fi
+rm -f /etc/netplan/50-cloud-init.yaml /etc/netplan/00-installer-config.yaml
 install -m 0600 -o root -g root "${BOX_ROOT}/configs/01-netcfg.yaml" /etc/netplan/01-netcfg.yaml
+if command -v netplan >/dev/null 2>&1; then
+    netplan generate || true
+fi
+
 install -m 0755 -o root -g root "${BOX_ROOT}/configs/40_custom_grub" /etc/grub.d/40_custom
+if [ -f /etc/default/grub ]; then
+    if grep -q '^#*GRUB_DISABLE_RECOVERY=' /etc/default/grub; then
+        sed -i 's/^#*GRUB_DISABLE_RECOVERY=.*/GRUB_DISABLE_RECOVERY="true"/' /etc/default/grub
+    else
+        printf 'GRUB_DISABLE_RECOVERY="true"\n' >> /etc/default/grub
+    fi
+fi
+if [ -f /etc/grub.d/10_linux ] && ! grep -q -- '--unrestricted' /etc/grub.d/10_linux; then
+    sed -i 's/^CLASS="--class gnu-linux --class gnu --class os"/CLASS="--class gnu-linux --class gnu --class os --unrestricted"/' /etc/grub.d/10_linux
+fi
 if command -v update-grub >/dev/null 2>&1; then
     update-grub || true
 fi
