@@ -80,7 +80,7 @@ jobs:
           FLASK_PID=$!
           php -S 127.0.0.1:8080 -t box/src/web >/tmp/php.log 2>&1 &
           PHP_PID=$!
-          trap 'kill "$FLASK_PID" "$PHP_PID" 2>/dev/null || true' EXIT
+          trap 'STATUS=$?; if [ "$STATUS" -ne 0 ]; then echo "--- flask.log ---"; cat /tmp/flask.log || true; echo "--- php.log ---"; cat /tmp/php.log || true; fi; kill "$FLASK_PID" "$PHP_PID" 2>/dev/null || true' EXIT
 
           READY=0
           for _ in $(seq 1 15); do

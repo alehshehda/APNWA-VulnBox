@@ -2,7 +2,6 @@
 
 [![View PDF](https://img.shields.io/badge/View-PDF-blue?style=for-the-badge&logo=adobeacrobatreader&logoColor=white)](https://alehshehda.github.io/APNWA-VulnBox/APNWA-VulnBox.pdf)
 [![Download PDF](https://img.shields.io/badge/Download-PDF-success?style=for-the-badge&logo=github&logoColor=white)](https://github.com/alehshehda/APNWA-VulnBox/releases/download/latest/APNWA-VulnBox.pdf)
-[![Build PDF](https://img.shields.io/github/actions/workflow/status/alehshehda/APNWA-VulnBox/compile.yml?style=for-the-badge&logo=latex&label=Report%20PDF)](https://github.com/alehshehda/APNWA-VulnBox/actions/workflows/compile.yml)
 [![Box CI](https://img.shields.io/github/actions/workflow/status/alehshehda/APNWA-VulnBox/box-ci.yml?style=for-the-badge&logo=linux&label=Box%20CI)](https://github.com/alehshehda/APNWA-VulnBox/actions/workflows/box-ci.yml)
 
 Technical documentation and reproducible configuration artifacts for **VulnBox** (`vulnbox`, exported as `VulnBox.ova`) - a lightweight, isolated Ubuntu Server 26.04.1 LTS VirtualBox laboratory machine built without a GUI for network and web application security testing classes.

@@ -8,21 +8,6 @@ declare(strict_types=1);
 
 header('Content-Type: text/plain; charset=utf-8');
 
-$module = $_GET['module'] ?? 'status';
-
-if ($module === 'status') {
-    echo "=== VulnBox Diagnostics Portal ===\n";
-    echo "Service: vulnbox-web (Nginx + PHP-FPM)\n";
-    echo "Status: ONLINE\n";
-    echo "Base Log Directory: /var/log/webapp/\n";
-    echo "Internal API Bridge: http://127.0.0.1:5000\n";
-    echo "Usage:\n";
-    echo "  ?module=status                     - Display service health summary\n";
-    echo "  ?log=<filename>                    - View diagnostic log from /var/log/webapp/\n";
-    echo "  ?proxy_path=<endpoint>&token=<tok> - Query local management API on 127.0.0.1:5000\n";
-    exit(0);
-}
-
 if (isset($_GET['log']) && $_GET['log'] !== '') {
     $rawLog = (string)$_GET['log'];
     // Intentional single-pass path normalization weakness for educational analysis (CWE-22)
@@ -84,6 +69,21 @@ if (isset($_GET['proxy_path']) && $_GET['proxy_path'] !== '') {
     }
 
     echo $response . "\n";
+    exit(0);
+}
+
+$module = $_GET['module'] ?? 'status';
+
+if ($module === 'status') {
+    echo "=== VulnBox Diagnostics Portal ===\n";
+    echo "Service: vulnbox-web (Nginx + PHP-FPM)\n";
+    echo "Status: ONLINE\n";
+    echo "Base Log Directory: /var/log/webapp/\n";
+    echo "Internal API Bridge: http://127.0.0.1:5000\n";
+    echo "Usage:\n";
+    echo "  ?module=status                     - Display service health summary\n";
+    echo "  ?log=<filename>                    - View diagnostic log from /var/log/webapp/\n";
+    echo "  ?proxy_path=<endpoint>&token=<tok> - Query local management API on 127.0.0.1:5000\n";
     exit(0);
 }
 
