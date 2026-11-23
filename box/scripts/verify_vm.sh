@@ -4,6 +4,14 @@ set -euo pipefail
 
 PASS_COUNT=0
 FAIL_COUNT=0
+TMP_PY_DIR=""
+
+cleanup_tmp() {
+    if [ -n "${TMP_PY_DIR}" ] && [ -d "${TMP_PY_DIR}" ]; then
+        rm -rf "${TMP_PY_DIR}"
+    fi
+}
+trap cleanup_tmp EXIT
 
 report_check() {
     local status="$1"
@@ -92,6 +100,28 @@ for svc in fail2ban smbd nginx flask-internal cron; do
     fi
 done
 
+HOME_DEV_MODE="$(stat -c '%a' /home/dev 2>/dev/null || true)"
+SSH_DIR_PERM="$(stat -c '%a:%U:%G' /home/dev/.ssh 2>/dev/null || true)"
+AUTH_KEYS_PERM="$(stat -c '%a:%U:%G' /home/dev/.ssh/authorized_keys 2>/dev/null || true)"
+SSHD_PUBKEY="$(sshd -T 2>/dev/null | awk '/^pubkeyauthentication / {print $2; exit}' || true)"
+if [ "${SSH_DIR_PERM}" = "700:dev:dev" ] \
+    && [ "${AUTH_KEYS_PERM}" = "600:dev:dev" ] \
+    && [ "${HOME_DEV_MODE}" != "777" ] \
+    && [ "${HOME_DEV_MODE}" != "775" ] \
+    && [ "${SSHD_PUBKEY}" = "yes" ]; then
+    report_check "PASS" "SSH directory permissions and sshd PubkeyAuthentication readiness verified"
+else
+    report_check "FAIL" "SSH StrictModes or PubkeyAuthentication readiness failed (home=${HOME_DEV_MODE}, .ssh=${SSH_DIR_PERM}, keys=${AUTH_KEYS_PERM}, pubkey=${SSHD_PUBKEY})"
+fi
+
+SOCKETS_OUT="$(ss -tln 2>/dev/null || true)"
+if printf '%s' "${SOCKETS_OUT}" | grep -qE '(:|\])445[[:space:]]' \
+    && printf '%s' "${SOCKETS_OUT}" | grep -q '127\.0\.0\.1:5000[[:space:]]'; then
+    report_check "PASS" "Listening sockets verified for :445 (Samba) and 127.0.0.1:5000 (Flask API)"
+else
+    report_check "FAIL" "Expected listening sockets missing for :445 or 127.0.0.1:5000"
+fi
+
 # 6. Samba configuration and share file
 if testparm -s >/dev/null 2>&1 && [ -f /srv/samba/public/deployment-notes.txt ]; then
     report_check "PASS" "Samba configuration valid and deployment-notes.txt present"
@@ -100,6 +130,12 @@ else
 fi
 
 # 7. Active HTTP probe: Nginx + PHP-FPM portal (:8080)
+if [ -S /run/php/php-fpm.sock ]; then
+    report_check "PASS" "PHP-FPM socket /run/php/php-fpm.sock is present"
+else
+    report_check "FAIL" "PHP-FPM socket /run/php/php-fpm.sock is missing"
+fi
+
 WEB_STATUS="$(curl -fsS "http://127.0.0.1:8080/?module=status" || true)"
 if printf '%s' "${WEB_STATUS}" | grep -q "VulnBox Diagnostics Portal"; then
     report_check "PASS" "HTTP probe on 127.0.0.1:8080/?module=status returned portal status"
@@ -114,7 +150,7 @@ else
     report_check "FAIL" "Stage 2 path normalization check failed to read config.ini"
 fi
 
-# 8. Active HTTP probe: Internal Flask API (127.0.0.1:5000)
+# 8. Active HTTP probe: Internal Flask API (127.0.0.1:5000) and PHP proxy bridge
 API_HEALTH="$(curl -fsS "http://127.0.0.1:5000/health" || true)"
 if printf '%s' "${API_HEALTH}" | grep -q '"status"'; then
     report_check "PASS" "Internal Flask API /health endpoint responded on 127.0.0.1:5000"
@@ -130,6 +166,13 @@ else
     report_check "FAIL" "Internal Flask API /api/v1/info authentication failed"
 fi
 
+PROXY_INFO="$(curl -fsS "http://127.0.0.1:8080/?proxy_path=/api/v1/info&token=${API_TOKEN}" || true)"
+if printf '%s' "${PROXY_INFO}" | grep -q '"managed_account"'; then
+    report_check "PASS" "Web proxy bridge 127.0.0.1:8080/?proxy_path= relayed request to Flask API"
+else
+    report_check "FAIL" "Web proxy bridge 127.0.0.1:8080/?proxy_path= failed to relay request"
+fi
+
 # 9. Sudoers, Cron, and Administrative script permissions
 if visudo -cf /etc/sudoers.d/90-dev-admin >/dev/null 2>&1; then
     report_check "PASS" "Sudoers policy /etc/sudoers.d/90-dev-admin passed visudo syntax check"
@@ -137,11 +180,14 @@ else
     report_check "FAIL" "Sudoers policy /etc/sudoers.d/90-dev-admin failed visudo check"
 fi
 
+CRON_PERM="$(stat -c '%a:%U:%G' /etc/cron.d/vulnbox-maintenance 2>/dev/null || true)"
 HOOK_PERM="$(stat -c '%a:%U:%G' /opt/admin/hooks/pre_backup.sh 2>/dev/null || true)"
-if [ -f /etc/cron.d/vulnbox-maintenance ] && [ "${HOOK_PERM}" = "775:root:dev" ]; then
-    report_check "PASS" "Cron configuration present and pre_backup.sh permissions are 0775 (root:dev)"
+if [ "${CRON_PERM}" = "644:root:root" ] \
+    && [ -x /opt/admin/backup_check.sh ] \
+    && [ "${HOOK_PERM}" = "775:root:dev" ]; then
+    report_check "PASS" "Cron policy (0644 root:root), backup_check.sh (+x), and pre_backup.sh (0775 root:dev) valid"
 else
-    report_check "FAIL" "Cron configuration or pre_backup.sh permissions invalid (${HOOK_PERM})"
+    report_check "FAIL" "Cron policy or hook invalid (cron=${CRON_PERM}, hook=${HOOK_PERM})"
 fi
 
 HELPER_PERM="$(stat -c '%a:%U:%G' /opt/admin/status_helper.py 2>/dev/null || true)"
@@ -149,6 +195,17 @@ if [ "${HELPER_PERM}" = "664:root:dev" ]; then
     report_check "PASS" "Module /opt/admin/status_helper.py permissions are 0664 (root:dev)"
 else
     report_check "FAIL" "Module /opt/admin/status_helper.py permissions invalid (${HELPER_PERM})"
+fi
+
+TMP_PY_DIR="$(mktemp -d)"
+chmod 0755 "${TMP_PY_DIR}"
+printf 'def collect_system_summary():\n    return {"probe": "pythonpath_ok"}\n' > "${TMP_PY_DIR}/status_helper.py"
+chmod 0644 "${TMP_PY_DIR}/status_helper.py"
+PY_PROBE="$(su -s /bin/bash dev -c "sudo PYTHONPATH='${TMP_PY_DIR}' /usr/bin/python3 /opt/admin/maintenance.py" || true)"
+if printf '%s' "${PY_PROBE}" | grep -q '"pythonpath_ok"'; then
+    report_check "PASS" "Sudoers PYTHONPATH override loaded custom status_helper.py as user dev"
+else
+    report_check "FAIL" "Sudoers PYTHONPATH override check failed as user dev"
 fi
 
 # 10. Verification flags and permissions

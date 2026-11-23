@@ -23,6 +23,7 @@ echo "[2/10] Installing required packages (minimal footprint)..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y --no-install-recommends \
+    openssh-server \
     ufw \
     fail2ban \
     python3-systemd \

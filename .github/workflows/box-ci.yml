@@ -99,4 +99,8 @@ jobs:
             --data-urlencode "ssh_key=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey lab@vulnbox" | grep -q 'registered'
           grep -q 'AAAAC3NzaC1lZDI1NTE5AAAAITestKey' "$VULNBOX_AUTH_KEYS_FILE"
           python3 box/src/admin/maintenance.py | grep -q 'VulnBox'
+          TMP_PY_PROBE="$(mktemp -d)"
+          printf 'def collect_system_summary():\n    return {"probe": "pythonpath_override"}\n' > "${TMP_PY_PROBE}/status_helper.py"
+          PYTHONPATH="${TMP_PY_PROBE}" python3 box/src/admin/maintenance.py | grep -q 'pythonpath_override'
+          rm -rf "${TMP_PY_PROBE}"
           bash box/src/admin/backup_check.sh

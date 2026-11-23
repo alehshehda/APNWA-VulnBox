@@ -32,11 +32,11 @@
     \draw[ctrl] (4.6, -2.0) -- node[flowlabel, above=2pt] {\scriptsize Ścieżki \texttt{/var/www} i \texttt{/opt/internal\_api}} (0, -2.0);
 
     % 2. Web portal path traversal
-    \draw[flow] (0, -2.9) -- node[flowlabel, above=2pt] {\scriptsize \textbf{2.} \texttt{GET /?log=....//....//opt/internal\_api/config.ini}} (8.6, -2.9);
+    \draw[flow] (0, -2.9) -- node[flowlabel, above=2pt] {\scriptsize \textbf{2.} \texttt{GET /?log=....//....//....//opt/internal\_api/config.ini}} (8.6, -2.9);
     \draw[ctrl] (8.6, -3.7) -- node[flowlabel, above=2pt] {\scriptsize Zwrot wartości \texttt{api\_token} (\texttt{X-Internal-Token})} (0, -3.7);
 
     % 3. Loopback API proxy to register SSH key
-    \draw[flow] (0, -4.6) -- node[flowlabel, above=2pt] {\scriptsize \textbf{3.} \texttt{POST /?proxy\_path=/api/v1/ssh-key} (token + klucz SSH)} (8.6, -4.6);
+    \draw[flow] (0, -4.6) -- node[flowlabel, above=2pt] {\scriptsize \textbf{3.} \texttt{POST /?proxy\_path=/api/v1/ssh-key\&token=...} (+ klucz SSH)} (8.6, -4.6);
     \draw[flow] (8.6, -5.4) -- node[flowlabel, above=2pt] {\scriptsize Żądanie do \texttt{127.0.0.1:5000}} (12.4, -5.4);
     \draw[ctrl] (12.4, -6.2) -- node[flowlabel, above=2pt] {\scriptsize Zapis klucza w \texttt{/home/dev/.ssh/authorized\_keys}} (4.6, -6.2);
 

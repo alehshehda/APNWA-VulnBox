@@ -9,8 +9,9 @@ import sys
 from pathlib import Path
 
 CURRENT_DIR = Path(__file__).resolve().parent
-if str(CURRENT_DIR) not in sys.path:
-    sys.path.append(str(CURRENT_DIR))
+# Place the script directory after PYTHONPATH entries so explicit overrides take precedence.
+sys.path = [p for p in sys.path if Path(p or ".").resolve() != CURRENT_DIR]
+sys.path.append(str(CURRENT_DIR))
 
 import status_helper  # noqa: E402
 

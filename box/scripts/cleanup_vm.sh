@@ -35,6 +35,8 @@ rm -f /var/log/vulnbox-backup.log
 for log_file in \
     /var/log/nginx/*.log \
     /var/log/fail2ban.log \
+    /var/log/auth.log \
+    /var/log/syslog \
     /var/log/dpkg.log \
     /var/log/alternatives.log \
     /var/log/cloud-init.log \
