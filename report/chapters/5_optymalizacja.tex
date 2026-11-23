@@ -48,8 +48,6 @@ $ sudo bash /tmp/APNWA-VulnBox/box/scripts/verify_vm.sh
 
 Uzyskanie wyniku \texttt{31 passed, 0 failed} (listing \ref{lst:verify-output}) potwierdza pełną spójność środowiska przed przystąpieniem do procedury czyszczenia.
 
-\Figure[0.88]{scr_06_verify_script.png}{Wynik działania skryptu audytowego verify\_vm.sh na maszynie VulnBox}{fig:scr-verify}
-
 \section{Higiena obrazu przed eksportem (cleanup\_vm.sh)}
 \label{sec:cleanup-vm}
 
@@ -82,5 +80,3 @@ Wygenerowany plik \texttt{VulnBox.ova} zaimportowano testowo pod nową nazwą w 
     \item poprawne przypisanie nowego adresu IPv4 z serwera DHCP dzięki uniwersalnej regule \texttt{match: name: "en*"} w konfiguracji Netplan,
     \item automatyczny start wszystkich sześciu kluczowych usług (\texttt{ssh}, \texttt{fail2ban}, \texttt{smbd}, \texttt{nginx}, \texttt{flask-internal}, \texttt{cron}) natychmiast po załadowaniu systemu.
 \end{itemize}
-
-\Figure[0.88]{scr_07_ova_boot.png}{Weryfikacja uruchomienia zaimportowanego obrazu VulnBox.ova oraz blokady edycji GRUB2}{fig:scr-boot}

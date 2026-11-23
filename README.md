@@ -58,7 +58,7 @@ Project developed for the **Advanced Penetration Testing of Networks and Web App
 │   ├── frontmatter/                    # Title page
 │   ├── chapters/                       # Chapters 1-6 (Polish project documentation)
 │   ├── bib/                            # BibTeX references (references.bib) and Polish bst style
-│   └── images/                         # TikZ vector diagrams, Affinity icons, and screenshot slots
+│   └── images/                         # TikZ vector diagrams and Affinity icons
 └── README.md                           # Project overview
 ```
 

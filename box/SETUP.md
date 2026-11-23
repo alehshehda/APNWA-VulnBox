@@ -24,9 +24,12 @@ For the post-export analyst verification walkthrough (`0-knowledge` to `root`), 
 
 ## 2. Option A: Automated Provisioning
 
-After installing a clean Ubuntu Server 26.04.1 LTS system and copying the repository (or `box/` directory) to the virtual machine (for example, `/tmp/APNWA-VulnBox/box`):
+After installing a clean Ubuntu Server 26.04.1 LTS system, clone the repository into `/tmp/APNWA-VulnBox` (or copy the `box/` directory there):
 
 ```bash
+# 0. Fetch repository artifacts into /tmp
+cd /tmp && git clone https://github.com/alehshehda/APNWA-VulnBox.git
+
 # 1. Provision all packages, accounts, services, and configurations
 sudo bash /tmp/APNWA-VulnBox/box/scripts/provision_vm.sh
 
