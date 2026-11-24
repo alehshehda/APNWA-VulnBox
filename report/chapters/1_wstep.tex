@@ -1,19 +1,19 @@
 \chapter{Wstęp}
 \label{chap:wstep}
 
-Przedmiotem dokumentacji jest zaprojektowanie, wdrożenie oraz kompleksowa weryfikacja maszyny wirtualnej o nazwie \textbf{VulnBox}. Głównym założeniem projektu jest zbudowanie deterministycznego, izolowanego środowiska opartego na systemie operacyjnym \textbf{Ubuntu Server 26.04.1 LTS} \cite{ubuntu2604}, które demonstruje wieloetapowy łańcuch błędów konfiguracyjnych prowadzący od braku wiedzy początkowej o systemie (\texttt{0-knowledge}) do pełnych uprawnień administracyjnych (\texttt{root}).
+Przedmiotem dokumentacji jest zaprojektowanie, wdrożenie oraz kompleksowa weryfikacja maszyny wirtualnej o nazwie \textbf{VulnBox}. Głównym założeniem projektu jest zbudowanie deterministycznego, izolowanego środowiska opartego na systemie operacyjnym \textbf{Ubuntu Server 26.04.1 LTS}, które demonstruje wieloetapowy łańcuch błędów konfiguracyjnych prowadzący od braku wiedzy początkowej o systemie (\texttt{0-knowledge}) do pełnych uprawnień administracyjnych (\texttt{root}).
 
 \section{Cel i zakres projektu}
 \label{sec:cel-zakres}
 
-Projekt obejmuje warstwę inżynieryjną samej maszyny wirtualnej eksportowanej do formatu \texttt{VulnBox.ova} \cite{ovf20} oraz zestaw zautomatyzowanych skryptów wdrożeniowych oraz audytowych utrzymywanych w repozytorium projektu. Architektura \texttt{VulnBox} została zaprojektowana tak, aby każdy etap weryfikacji wynikał bezpośrednio z błędów konfiguracji konkretnych usług systemowych lub aplikacyjnych, przy jednoczesnym zachowaniu pełnej odporności samego systemu bazowego na nieautoryzowane modyfikacje z poziomu konsoli wirtualizatora.
+Projekt obejmuje warstwę inżynieryjną samej maszyny wirtualnej eksportowanej do formatu \texttt{VulnBox.ova} \cite{ovf20} oraz zestaw zautomatyzowanych skryptów wdrożeniowych i audytowych utrzymywanych w repozytorium projektu \cite{vulnbox_repo}. Architektura \texttt{VulnBox} została zaprojektowana tak, aby każdy etap weryfikacji wynikał bezpośrednio z błędów konfiguracji konkretnych usług systemowych lub aplikacyjnych, przy jednoczesnym zachowaniu pełnej odporności samego systemu bazowego na nieautoryzowane modyfikacje z poziomu konsoli wirtualizatora.
 
 W ramach realizacji projektu wyodrębniono następujące zadania szczegółowe:
 \begin{enumerate}
     \item Przygotowanie bazowego obrazu systemu \textbf{Ubuntu Server 26.04.1 LTS} (\texttt{amd64}) w hiperwizorze Oracle VirtualBox pod nazwą \texttt{VulnBox} (nazwa hosta \texttt{vulnbox}).
-    \item Skonfigurowanie warstwy sieciowej z wykorzystaniem \textbf{Netplan} \cite{netplan} w sposób zapewniający bezobsługowe pobieranie adresacji IP przez protokół DHCP niezależnie od identyfikatora karty sieciowej po imporcie pliku \texttt{VulnBox.ova}.
-    \item Zabezpieczenie \textbf{GRUB2} \cite{grub2} hasłem uwierzytelniającym opartym na algorytmie \texttt{PBKDF2-SHA512} przy zachowaniu automatycznego startu domyślnego jądra (\texttt{--unrestricted}) oraz wdrożenie ochrony z użyciem zapory \textbf{UFW} \cite{ufw} i usługi \textbf{Fail2Ban} \cite{fail2ban}.
-    \item Wdrożenie czterowarstwowego łańcucha usług: zasobu plikowego \textbf{Samba} (\texttt{:445/tcp}) \cite{samba}, portalu diagnostycznego \textbf{Nginx + PHP-FPM} (\texttt{:8080/tcp}) \cite{nginx}, wewnętrznego serwisu \textbf{Flask API} (\texttt{127.0.0.1:5000}) \cite{flask} oraz mechanizmów administracyjnych (\texttt{cron} i \texttt{sudoers.d}) \cite{sudoers}.
+    \item Skonfigurowanie warstwy sieciowej z wykorzystaniem \textbf{Netplan} w sposób zapewniający bezobsługowe pobieranie adresacji IP przez protokół DHCP niezależnie od identyfikatora karty sieciowej po imporcie pliku \texttt{VulnBox.ova}.
+    \item Zabezpieczenie \textbf{GRUB2} hasłem \texttt{PBKDF2-SHA512} przy zachowaniu automatycznego startu systemu (flaga \texttt{--unrestricted}) oraz wdrożenie ochrony z użyciem zapory \textbf{UFW} i usługi \textbf{Fail2Ban}.
+    \item Wdrożenie czterowarstwowego łańcucha usług: zasobu plikowego \textbf{Samba} (\texttt{:445/tcp}), portalu diagnostycznego \textbf{Nginx + PHP-FPM} (\texttt{:8080/tcp}), wewnętrznego serwisu \textbf{Flask API} (\texttt{127.0.0.1:5000}) oraz mechanizmów administracyjnych (\texttt{cron} i \texttt{sudoers.d}).
     \item Przeprowadzenie pełnej weryfikacji manualnej (\emph{End-to-End}) oraz automatycznej przy użyciu skryptu audytowego \texttt{verify\_vm.sh}, połączonej z procedurą czyszczenia obrazu (\texttt{cleanup\_vm.sh}) przed eksportem do pliku \texttt{VulnBox.ova}.
 \end{enumerate}
 
@@ -45,8 +45,8 @@ W tabeli \ref{tab:wymagania-bazowe} zestawiono kluczowe wymagania obligatoryjne 
 \section{Struktura repozytorium projektowego}
 \label{sec:struktura-repo}
 
-Repozytorium projektu zostało podzielone na dwa odseparowane moduły funkcjonalne:
+Wszystkie kody źródłowe, konfiguracje usług oraz dokumentacja projektu są utrzymywane w publicznym repozytorium GitHub (\url{https://github.com/alehshehda/APNWA-VulnBox}) \cite{vulnbox_repo} podzielonym na dwa główne moduły oraz potoki automatyzacji CI/CD (\texttt{.github/workflows/}):
 \begin{itemize}
-    \item \texttt{report/} - źródła niniejszej dokumentacji projektowej w systemie \LaTeX{} kompilowane automatycznie w potoku CI/CD do pliku \texttt{APNWA-VulnBox.pdf},
-    \item \texttt{box/} - kompletny pakiet wdrożeniowy maszyny wirtualnej \texttt{VulnBox}, obejmujący dokumentację instalacyjną \texttt{box/SETUP.md}, przewodnik weryfikacyjny \texttt{box/WALKTHROUGH.md}, pliki konfiguracyjne usług (\texttt{box/configs/}), kod źródłowy komponentów webowych i administracyjnych (\texttt{box/src/}) oraz skrypty automatyzujące budowę, weryfikację i czyszczenie systemu (\texttt{box/scripts/}).
+    \item \texttt{report/} - źródła niniejszej dokumentacji projektowej w systemie \LaTeX{} kompilowane automatycznie przez potok \texttt{compile.yml} do pliku \texttt{APNWA-VulnBox.pdf} publikowanego w GitHub Releases oraz GitHub Pages,
+    \item \texttt{box/} - kompletny pakiet wdrożeniowy maszyny wirtualnej \texttt{VulnBox}, obejmujący dokumentację instalacyjną \texttt{box/SETUP.md}, przewodnik weryfikacyjny \texttt{box/WALKTHROUGH.md}, pliki konfiguracyjne usług (\texttt{box/configs/}), kod źródłowy komponentów (\texttt{box/src/}) oraz skrypty automatyzujące budowę, weryfikację i czyszczenie systemu (\texttt{box/scripts/}), walidowane dodatkowo w potoku \texttt{box-ci.yml}.
 \end{itemize}

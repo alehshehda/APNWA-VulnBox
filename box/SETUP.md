@@ -1,8 +1,8 @@
 # VulnBox Virtual Machine Setup & Export Guide (`VulnBox.ova`)
 
-This guide covers building, hardening, validating, and exporting the **VulnBox** virtual machine (`VulnBox.ova`) using either **automated provisioning** or **manual step-by-step installation**.
+This guide covers building, hardening, validating, and exporting **VulnBox** (`VulnBox.ova`) via automated provisioning or manual installation.
 
-For the post-export analyst verification walkthrough (`0-knowledge` to `root`), see [WALKTHROUGH.md](WALKTHROUGH.md).
+For the post-export E2E verification walkthrough (`0-knowledge` to `root`), see [WALKTHROUGH.md](WALKTHROUGH.md).
 
 ---
 

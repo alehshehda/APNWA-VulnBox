@@ -13,11 +13,11 @@ Technical documentation and reproducible configuration artifacts for **VulnBox**
 - **Headless Ubuntu Server 26.04.1 LTS Base:** Zero desktop environment (`multi-user.target`), hardware-independent Netplan DHCP (`en*` / `eth*`, `optional: true`, `dhcp-identifier: mac` for seamless OVA import), and password-protected GRUB2 bootloader with `--unrestricted` unattended normal boot.
 - **Network Access Control:** UFW host firewall permitting only TCP ports `22` (SSH), `445` (Samba), and `8080` (Nginx), combined with `fail2ban` brute-force protection on SSH.
 - **Multi-Layer Service Architecture:**
-  - **Network Discovery (`Samba :445`, `nobody`):** Read-only anonymous guest share exposing internal deployment notes.
-  - **Web Diagnostics (`Nginx + PHP-FPM :8080`, `www-data`):** Lightweight PHP diagnostics panel with single-pass log path normalization and an internal HTTP bridge to the loopback service.
-  - **Loopback Service (`Python Flask 127.0.0.1:5000`, `dev`):** Managed via `systemd`, reachable only locally or through the PHP portal's internal HTTP proxy bridge (`?proxy_path=`), managing SSH access that guards `/home/dev/user.txt`.
-  - **Administrative Tasks (`root`):** Scheduled `cron` maintenance job (`pre_backup.sh` hook) and `sudoers.d` Python task delegation (`maintenance.py` + `PYTHONPATH`) guarding `/root/root.txt`.
-- **Modular Documentation & Automated Audit:** VM build and export manual ([`box/SETUP.md`](box/SETUP.md)), step-by-step E2E verification walkthrough ([`box/WALKTHROUGH.md`](box/WALKTHROUGH.md)), idempotent [`provision_vm.sh`](box/scripts/provision_vm.sh), self-test suite [`verify_vm.sh`](box/scripts/verify_vm.sh), and OVA pre-export cleaner [`cleanup_vm.sh`](box/scripts/cleanup_vm.sh).
+  - **Network Discovery (`Samba :445`, `nobody`):** Read-only anonymous guest share exposing deployment notes (`CWE-538`, `CWE-200`).
+  - **Web Diagnostics (`Nginx + PHP-FPM :8080`, `www-data`):** PHP diagnostics panel featuring single-pass log path sanitization (`CWE-22`) and an unrestricted internal HTTP proxy bridge (`CWE-441`, `CWE-918`) paired with group-readable API config permissions (`CWE-732`).
+  - **Loopback Service (`Python Flask 127.0.0.1:5000`, `dev`):** Managed via `systemd`, reachable only locally or through the PHP bridge (`?proxy_path=`), authenticating via a static token (`CWE-798`) and managing SSH keys protecting `/home/dev/user.txt` (`0600`).
+  - **Administrative Tasks (`root`):** Scheduled `cron` hook (`pre_backup.sh`, `CWE-732`) and `sudoers.d` Python delegation (`maintenance.py` + `PYTHONPATH`, `CWE-427`, `CWE-732`) guarding `/root/root.txt` (`0600`).
+- **Modular Documentation & Automated Audit:** VM build and export manual ([`box/SETUP.md`](box/SETUP.md)), step-by-step E2E walkthrough ([`box/WALKTHROUGH.md`](box/WALKTHROUGH.md)), idempotent [`provision_vm.sh`](box/scripts/provision_vm.sh), 31-check self-test suite [`verify_vm.sh`](box/scripts/verify_vm.sh), and OVA pre-export cleaner [`cleanup_vm.sh`](box/scripts/cleanup_vm.sh).
 
 ---
 

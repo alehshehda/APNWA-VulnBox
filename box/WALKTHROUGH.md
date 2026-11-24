@@ -25,7 +25,7 @@ PORT     STATE    SERVICE     VERSION
 
 ---
 
-## Stage 1: Samba Anonymous Share Enumeration (`[Host]`, `:445`, `nobody`)
+## Stage 1: Samba Anonymous Share Enumeration (`[Host]`, `:445`, `nobody` - `CWE-538`, `CWE-200`)
 
 ### Step 1.1 (`[Host]`). List available SMB shares
 
@@ -78,7 +78,7 @@ Remove this draft file from /srv/samba/public before production handover.
 
 ---
 
-## Stage 2: Web Diagnostics & Path Normalization Bypass (`[Host]`, `:8080`, `www-data`)
+## Stage 2: Web Diagnostics & Path Normalization Bypass (`[Host]`, `:8080`, `www-data` - `CWE-22`, `CWE-732`, `CWE-441`/`CWE-918`)
 
 ### Step 2.1 (`[Host]`). Inspect the diagnostics portal status page
 
@@ -130,7 +130,7 @@ authorized_keys_path = /home/dev/.ssh/authorized_keys
 
 ---
 
-## Stage 3 & Stage 4: Loopback Flask API (`127.0.0.1:5000`) & SSH Access (`dev`)
+## Stage 3 & Stage 4: Loopback Flask API (`127.0.0.1:5000` - `CWE-798`) & SSH Access (`dev`)
 
 ### Step 3.1 (`[Host]`). Query the loopback API through the PHP proxy bridge
 
@@ -198,7 +198,7 @@ FLAG{Us3r_Sh3ll!7xK9#mP2@vQ4_d3v%8nR1}
 
 Run all Stage 5 steps inside the `dev@vulnbox:~$` SSH session opened in Step 4.1.
 
-### Path A: Writable `cron` Hook Script (`root` execution every 60s)
+### Path A: Writable `cron` Hook Script (`root` execution every 60s - `CWE-732`)
 
 #### Step 5A.1 (`[VM: dev@vulnbox]`). Inspect the scheduled task and hook permissions
 
@@ -246,7 +246,7 @@ FLAG{R00t_Pwn3d!9zW6@kL3#bT8_sys%4mX2}
 
 ---
 
-### Path B: `sudoers.d` `SETENV` + `PYTHONPATH` Module Hijack (Immediate `root`)
+### Path B: `sudoers.d` `SETENV` + `PYTHONPATH` Module Hijack (Immediate `root` - `CWE-427`, `CWE-732`)
 
 #### Step 5B.1 (`[VM: dev@vulnbox]`). Check allowed `sudo` rules and inspect `/opt/admin/maintenance.py`
 

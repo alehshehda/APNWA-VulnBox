@@ -74,9 +74,9 @@ $ VBoxManage export "VulnBox" --output "VulnBox.ova" --ovf20 --vsys 0 \
     --description "APNWA Project: Vulnerable Virtual Machine (Ubuntu Server 26.04.1 LTS)"
 \end{lstlisting}
 
-Wygenerowany plik \texttt{VulnBox.ova} zaimportowano testowo pod nową nazwą w programie z zaznaczoną opcją reinicjalizacji adresów MAC wszystkich kart sieciowych. Podczas rozruchu potwierdzono:
+Wygenerowany plik \texttt{VulnBox.ova} zaimportowano testowo pod nową nazwą w programie VirtualBox z zaznaczoną opcją reinicjalizacji adresów MAC wszystkich kart sieciowych. Podczas rozruchu potwierdzono:
 \begin{itemize}
     \item brak możliwości wejścia w tryb edycji parametrów jądra w menu GRUB2 bez podania hasła administratora, przy jednoczesnym automatycznym starcie systemu bez ingerencji użytkownika,
     \item poprawne przypisanie nowego adresu IPv4 z serwera DHCP dzięki uniwersalnej regule \texttt{match: name: "en*"} w konfiguracji Netplan,
-    \item automatyczny start wszystkich sześciu kluczowych usług (\texttt{ssh}, \texttt{fail2ban}, \texttt{smbd}, \texttt{nginx}, \texttt{flask-internal}, \texttt{cron}) natychmiast po załadowaniu systemu.
+    \item automatyczny start wszystkich kluczowych usług (\texttt{ssh}, \texttt{fail2ban}, \texttt{smbd}, \texttt{nginx}, \texttt{php*-fpm}, \texttt{flask-internal}, \texttt{cron}) natychmiast po załadowaniu systemu.
 \end{itemize}
