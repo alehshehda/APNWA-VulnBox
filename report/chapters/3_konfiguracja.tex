@@ -128,7 +128,14 @@ if (isset($_GET['log']) && $_GET['log'] !== '') {
 
 Wewnętrzny serwis zarządzający (\texttt{/opt/internal\_api/app.py}) jest uruchamiany jako jednostka systemowa \texttt{/etc/systemd/system/flask-internal.service} \cite{systemd_exec}. W sekcji \texttt{[Service]} zdefiniowano dyrektywy \texttt{User=dev}, \texttt{Group=dev} oraz dodatkową grupę \texttt{www-data} (\texttt{SupplementaryGroups}), a serwer HTTP wiąże się wyłącznie z adresem lokalnym \texttt{127.0.0.1:5000}. Taki dobór uprawnień pozwala usłudze zapisywać klucze SSH użytkownika \texttt{dev} w pliku \path{/home/dev/.ssh/authorized_keys}, a jednocześnie odczytywać wspólny plik \path{/opt/internal_api/config.ini} (\texttt{0640 root:www-data}) bez udostępniania go innym użytkownikom systemu.
 
-\begin{lstlisting}[language=Python, caption={Obsługa rejestracji klucza SSH w serwisie /opt/internal\_api/app.py}, label={lst:flask-api}]
+\begin{lstlisting}[language=Python, caption={Wczytanie tokenu i rejestracja klucza SSH w pliku app.py}, label={lst:flask-api}]
+def load_settings() -> dict:
+    # ... odczyt pliku /opt/internal_api/config.ini
+    api_token = parser.get(
+        "security", "api_token", fallback="vb-internal-9f8e7d6c5b4a3f2e1d0c"
+    )
+    # ...
+
 @app.post("/api/v1/ssh-key")
 def register_ssh_key():
     if not is_authorized(request):
@@ -144,7 +151,7 @@ def register_ssh_key():
     return jsonify({"status": "registered", "account": "dev", "authorized_keys_path": str(target_file)})
 \end{lstlisting}
 
-\textbf{Analiza słabości konfiguracyjnej, flaga użytkownika i klasyfikacja CWE (Etap 3):} Bezpieczeństwo punktu końcowego \texttt{POST /api/v1/ssh-key} opiera się na izolacji sieciowej gniazda \texttt{127.0.0.1:5000} oraz statycznym tokenie \texttt{X-Internal-Token} przechowywanym w pliku \texttt{config.ini} i dodatkowo zakodowanym w \texttt{app.py} (\textbf{CWE-798} \cite{cwe798}). Połączenie odczytu tego tokenu z etapu 2 z mostkiem \texttt{?proxy\_path=} pozwala dopisać własny klucz publiczny do \path{/home/dev/.ssh/authorized_keys}. Ponieważ konto \texttt{dev} ma zablokowane logowanie hasłem (\texttt{passwd -l dev}), uwierzytelnianie kluczem SSH staje się jedynym sposobem uzyskania powłoki lokalnej. Po zalogowaniu jako \texttt{dev} możliwe jest odczytanie pierwszej flagi \path{/home/dev/user.txt}.
+\textbf{Analiza słabości konfiguracyjnej, flaga użytkownika i klasyfikacja CWE (Etap 3):} Bezpieczeństwo punktu końcowego \texttt{POST /api/v1/ssh-key} opiera się na izolacji sieciowej gniazda \texttt{127.0.0.1:5000} oraz statycznym tokenie \texttt{X-Internal-Token} przechowywanym jawnie w pliku \texttt{config.ini} i dodatkowo zakodowanym na stałe jako wartość zapasowa (\texttt{fallback}) w funkcji \texttt{load\_settings()} w \texttt{app.py} (\textbf{CWE-798} \cite{cwe798}). Połączenie odczytu tego tokenu z etapu 2 z mostkiem \texttt{?proxy\_path=} pozwala dopisać własny klucz publiczny do \path{/home/dev/.ssh/authorized_keys}. Ponieważ konto \texttt{dev} ma zablokowane logowanie hasłem (\texttt{passwd -l dev}), uwierzytelnianie kluczem SSH staje się jedynym sposobem uzyskania powłoki lokalnej. Po zalogowaniu jako \texttt{dev} możliwe jest odczytanie pierwszej flagi \path{/home/dev/user.txt}.
 
 \section{Etap 4 i 5: Pozyskanie flagi użytkownika i eskalacja do konta root}
 \label{sec:konfiguracja-privesc}
