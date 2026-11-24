@@ -33,7 +33,8 @@ apt-get install -y --no-install-recommends \
     python3 \
     python3-flask \
     cron \
-    curl
+    curl \
+    nano
 
 echo "[3/10] Creating user account 'dev' and verification flags..."
 if ! id -u dev >/dev/null 2>&1; then

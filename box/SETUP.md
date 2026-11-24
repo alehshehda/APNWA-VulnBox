@@ -61,7 +61,7 @@ grep -qE '^127\.0\.1\.1[[:space:]]' /etc/hosts || printf '127.0.1.1\tvulnbox\n' 
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
     openssh-server ufw fail2ban python3-systemd samba nginx \
-    php-fpm python3 python3-flask cron curl
+    php-fpm python3 python3-flask cron curl nano
 ```
 
 ### Step 3.2. User Account `dev` and Verification Flags
