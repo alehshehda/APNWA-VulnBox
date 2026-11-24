@@ -1,12 +1,12 @@
 \chapter{Optymalizacja i testy}
 \label{chap:optymalizacja}
 
-Końcowym etapem prac inżynieryjnych było przeprowadzenie zautomatyzowanego audytu konfiguracji na żywym systemie, oczyszczenie śladów po testach weryfikacyjnych oraz wyeksportowanie maszyny do przenośnego obrazu \texttt{VulnBox.ova} wraz z testem uruchomieniowym (\emph{out-of-the-box}) na czystej instancji wirtualizatora.
+Końcowym etapem było przeprowadzenie audytu konfiguracji, czyszczenie śladów oraz wyeksportowanie maszyny do obrazu \texttt{VulnBox.ova} wraz z testem out-of-the-box.
 
-\section{Zautomatyzowany audyt konfiguracji i usług (verify\_vm.sh)}
+\section{Zautomatyzowany audyt konfiguracji i usług}
 \label{sec:verify-vm}
 
-Aby wyeliminować ryzyko pominięcia któregokolwiek z komponentów przed eksportem obrazu, opracowano skrypt \texttt{box/scripts/verify\_vm.sh}. Skrypt ten realizuje zarówno pasywną kontrolę plików konfiguracyjnych, uprawnień i gniazd sieciowych (\texttt{ss -tln}), jak i aktywne sondy sieciowe oraz lokalne testy ścieżek (\emph{End-to-End}) wobec usług na portach \texttt{22/tcp}, \texttt{445/tcp}, \texttt{8080/tcp} oraz \texttt{5000/tcp}, w tym wywołanie mostka \texttt{?proxy\_path=} i weryfikację nadpisania modułu przez \texttt{PYTHONPATH} z poziomu konta \texttt{dev}.
+Aby wyeliminować ryzyko pominięcia któregokolwiek z komponentów przed eksportem obrazu, opracowano skrypt \texttt{box/scripts/verify\_vm.sh}. Skrypt ten realizuje kontrolę plików konfiguracyjnych, uprawnień i gniazd sieciowych (\texttt{ss -tln}) oraz lokalne testy ścieżek wobec usług na portach \texttt{22/tcp}, \texttt{445/tcp}, \texttt{8080/tcp} oraz \texttt{5000/tcp}, w tym wywołanie \texttt{?proxy\_path=} i weryfikację nadpisania modułu przez \texttt{PYTHONPATH} z poziomu konta \texttt{dev}.
 
 \begin{lstlisting}[language=bash, caption={Wynik działania skryptu audytowego verify\_vm.sh na maszynie VulnBox}, label={lst:verify-output}]
 $ sudo bash /tmp/APNWA-VulnBox/box/scripts/verify_vm.sh
@@ -48,25 +48,25 @@ $ sudo bash /tmp/APNWA-VulnBox/box/scripts/verify_vm.sh
 
 Uzyskanie wyniku \texttt{31 passed, 0 failed} (listing \ref{lst:verify-output}) potwierdza pełną spójność środowiska przed przystąpieniem do procedury czyszczenia.
 
-\section{Higiena obrazu przed eksportem (cleanup\_vm.sh)}
+\section{Higiena obrazu przed eksportem}
 \label{sec:cleanup-vm}
 
-Po zakończeniu audytu \texttt{verify\_vm.sh} oraz ewentualnych testów manualnych z rozdziału \ref{chap:weryfikacja} konieczne jest przywrócenie stanu początkowego wszystkich modyfikowanych plików tak, aby osoba importująca obraz \texttt{VulnBox.ova} otrzymała czyste środowisko bez pozostawionych kluczy SSH, logów testowych (także wygenerowanych przez sondy \texttt{verify\_vm.sh}) czy historii poleceń. Zadanie to automatyzuje skrypt \texttt{box/scripts/cleanup\_vm.sh} (uruchamiany obowiązkowo po \texttt{verify\_vm.sh}, bezpośrednio przed \texttt{sudo poweroff}), który wykonuje osiem operacji:
+Po zakończeniu audytu \texttt{verify\_vm.sh} oraz ewentualnych testów manualnych z rozdziału \ref{chap:weryfikacja} konieczne jest przywrócenie stanu początkowego wszystkich modyfikowanych plików tak, aby osoba importująca obraz \texttt{VulnBox.ova} otrzymała czyste środowisko bez pozostawionych kluczy SSH, logów testowych czy historii poleceń. Zadanie to automatyzuje skrypt \texttt{box/scripts/cleanup\_vm.sh} (uruchamiany obowiązkowo po \texttt{verify\_vm.sh}, bezpośrednio przed \texttt{sudo poweroff}), który wykonuje osiem operacji:
 \begin{enumerate}
     \item zatrzymanie usług generujących logi (\texttt{cron}, \texttt{fail2ban}, \texttt{nginx}, \texttt{smbd}, \texttt{flask-internal}) na czas czyszczenia,
     \item wyzerowanie pliku \path{/home/dev/.ssh/authorized_keys} i przywrócenie uprawnień \texttt{0600} (\texttt{dev:dev}),
     \item odtworzenie oryginalnych wersji plików \path{/opt/admin/hooks/pre_backup.sh} (\texttt{0775}, \texttt{root:dev}) oraz \path{/opt/admin/status_helper.py} (\texttt{0664}, \texttt{root:dev}) wraz z usunięciem katalogów \texttt{\_\_pycache\_\_},
-    \item bezpieczne wyzerowanie aktywnych plików logów usług (\texttt{nginx}, \texttt{fail2ban}, \texttt{auth.log}, \texttt{syslog}, \texttt{dpkg}, \texttt{wtmp}/\texttt{btmp}/\texttt{lastlog}) bez naruszania ich właścicieli oraz usunięcie plików w \path{/var/log/samba/}, \path{/var/log/apt/} i archiwów rotacyjnych,
+    \item bezpieczne wyzerowanie aktywnych plików logów usług (\texttt{nginx}, \texttt{fail2ban}, \texttt{auth.log}, \texttt{syslog}, \texttt{dpkg}, \texttt{wtmp}/\texttt{btmp}/\texttt{lastlog}) oraz usunięcie plików w \path{/var/log/samba/}, \path{/var/log/apt/} i archiwów rotacyjnych,
     \item usunięcie nieużywanych pakietów, pamięci podręcznej i list APT (\texttt{apt-get autoremove --purge}, \texttt{apt-get clean}, \path{/var/lib/apt/lists/*}) oraz zredukowanie dziennika \texttt{journalctl --vacuum-time=1s},
     \item usunięcie plików historii powłoki i sesji (\texttt{.bash\_history}, \texttt{.lesshst}, \texttt{.viminfo}) dla konta \texttt{root} oraz wszystkich katalogów domowych w \path{/home/*},
     \item wyczyszczenie katalogów tymczasowych \path{/tmp} i \path{/var/tmp},
-    \item wyzerowanie wolnego miejsca na partycji głównej (\texttt{dd if=/dev/zero}) z zachowaniem bufora bezpieczeństwa \texttt{1024 MB} oraz uruchomienie \texttt{fstrim} przed wyłączeniem maszyny w celu zmniejszenia rozmiaru eksportowanego pliku \texttt{VulnBox.ova}.
+    \item wyzerowanie wolnego miejsca na partycji głównej (\texttt{dd if=/dev/zero}) z zachowaniem bufora \texttt{1024 MB} oraz uruchomienie \texttt{fstrim} przed wyłączeniem maszyny w celu zmniejszenia rozmiaru eksportowanego pliku \texttt{VulnBox.ova}.
 \end{enumerate}
 
-\section{Eksport do pliku VulnBox.ova i testy uruchomieniowe (out-of-the-box)}
+\section{Eksport do pliku VulnBox.ova i test out-of-the-box}
 \label{sec:eksport-ova}
 
-Po wyłączeniu maszyny poleceniem \texttt{sudo poweroff} odłączono pomocniczy interfejs NAT oraz wirtualny napęd optyczny ISO, pozostawiając wyłącznie kartę sieci laboratoryjnej. Następnie wyeksportowano maszynę do standardu OVF 2.0 \cite{ovf20} przy użyciu narzędzia \texttt{VBoxManage}:
+Po wyłączeniu maszyny poleceniem \texttt{sudo poweroff} odłączono pomocniczy interfejs NAT oraz wirtualny napęd ISO, pozostawiając wyłącznie kartę sieci laboratoryjnej. Następnie wyeksportowano maszynę do standardu OVF 2.0 \cite{ovf20} przy użyciu narzędzia \texttt{VBoxManage}:
 
 \begin{lstlisting}[language=bash, caption={Polecenie eksportu maszyny wirtualnej do pliku VulnBox.ova}, label={lst:vbox-export}]
 $ VBoxManage export "VulnBox" --output "VulnBox.ova" --ovf20 --vsys 0 \
@@ -74,7 +74,7 @@ $ VBoxManage export "VulnBox" --output "VulnBox.ova" --ovf20 --vsys 0 \
     --description "APNWA Project: Vulnerable Virtual Machine (Ubuntu Server 26.04.1 LTS)"
 \end{lstlisting}
 
-Wygenerowany plik \texttt{VulnBox.ova} zaimportowano testowo pod nową nazwą w programie Oracle VirtualBox z zaznaczoną opcją reinicjalizacji adresów MAC wszystkich kart sieciowych (\emph{Generate new MAC addresses for all network adapters}). Podczas rozruchu potwierdzono:
+Wygenerowany plik \texttt{VulnBox.ova} zaimportowano testowo pod nową nazwą w programie z zaznaczoną opcją reinicjalizacji adresów MAC wszystkich kart sieciowych. Podczas rozruchu potwierdzono:
 \begin{itemize}
     \item brak możliwości wejścia w tryb edycji parametrów jądra w menu GRUB2 bez podania hasła administratora, przy jednoczesnym automatycznym starcie systemu bez ingerencji użytkownika,
     \item poprawne przypisanie nowego adresu IPv4 z serwera DHCP dzięki uniwersalnej regule \texttt{match: name: "en*"} w konfiguracji Netplan,

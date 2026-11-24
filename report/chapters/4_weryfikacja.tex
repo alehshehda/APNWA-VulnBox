@@ -1,11 +1,11 @@
 \chapter{Scenariusze weryfikacji}
 \label{chap:weryfikacja}
 
-W celu potwierdzenia, że zaprojektowany w rozdziale \ref{chap:konfiguracja} łańcuch zależności pomiędzy usługami jest w pełni funkcjonalny i powtarzalny, przeprowadzono manualny test weryfikacyjny \emph{End-to-End} (E2E). Test zrealizowano z pozycji stacji analitycznej podłączonej do izolowanej sieci \texttt{vboxnet0} (\texttt{192.168.56.0/24}), rozpoczynając od poziomu zerowej wiedzy o konfiguracji docelowego hosta (\texttt{0-knowledge}, adres IP maszyny \texttt{192.168.56.101}) aż do uzyskania uprawnień \texttt{uid=0(root)} i odczytu obu flag kontrolnych.
+W celu potwierdzenia, że zaprojektowany w rozdziale \ref{chap:konfiguracja} łańcuch zależności pomiędzy usługami jest w pełni funkcjonalny i powtarzalny, przeprowadzono manualny test weryfikacyjny \emph{End-to-End}. Test zrealizowano z pozycji stacji analitycznej podłączonej do izolowanej sieci \texttt{vboxnet0} (\texttt{192.168.56.0/24}), rozpoczynając od poziomu zerowej wiedzy o konfiguracji docelowego hosta (\texttt{0-knowledge}, adres IP maszyny \texttt{192.168.56.101}) aż do uzyskania uprawnień \texttt{root} i odczytu obu flag.
 
 \TikzFigure[0.98]{sekwencja_weryfikacji.tex}{Diagram sekwencji wywołań zrealizowanych podczas praktycznej weryfikacji E2E}{fig:sekwencja}
 
-Na rysunku \ref{fig:sekwencja} przedstawiono chronologiczny przebieg komunikacji pomiędzy stacją analityczną a kolejnymi usługami uruchomionymi na maszynie \textbf{VulnBox}.
+Na rysunku \ref{fig:sekwencja} przedstawiono przebieg komunikacji pomiędzy stacją analityczną a kolejnymi usługami uruchomionymi na maszynie \textbf{VulnBox}.
 
 \section{Etap 1: Rekonesans sieciowy i enumeracja zasobu Samba}
 \label{sec:etap1-samba}
@@ -53,7 +53,7 @@ Jak wynika z listingu \ref{lst:e2e-stage1}, port \texttt{5000/tcp} jest poprawni
 \section{Etap 2: Weryfikacja portalu WWW (:8080) i odczyt konfiguracji API}
 \label{sec:etap2-web}
 
-W drugim etapie wykorzystano informacje pozyskane z notatki wdrożeniowej do zbadania portalu diagnostycznego działającego na porcie \texttt{8080/tcp}. Za pomocą zagnieżdżonej sekwencji \texttt{....//} ominięto jednoprzebiegowy filtr \texttt{str\_replace('../', '', ...)} w parametrze \texttt{?log=}, co pozwoliło na odczyt kodu źródłowego \texttt{index.php} oraz pliku konfiguracyjnego \texttt{/opt/internal\_api/config.ini} w kontekście uprawnień grupy \texttt{www-data}.
+W drugim etapie wykorzystano informacje pozyskane z notatki do zbadania portalu diagnostycznego działającego na porcie \texttt{8080/tcp}. Za pomocą zagnieżdżonej sekwencji \texttt{....//} ominięto jednoprzebiegowy filtr \texttt{str\_replace('../', '', ...)} w parametrze \texttt{?log=}, co pozwoliło na odczyt kodu źródłowego \texttt{index.php} oraz pliku konfiguracyjnego \texttt{/opt/internal\_api/config.ini} w kontekście uprawnień grupy \texttt{www-data}.
 
 \begin{lstlisting}[language=bash, caption={Weryfikacja błędu normalizacji ścieżki i odczyt tokenu X-Internal-Token}, label={lst:e2e-stage2}]
 $ curl -s "http://192.168.56.101:8080/?module=status"
@@ -83,12 +83,12 @@ target_account = dev
 authorized_keys_path = /home/dev/.ssh/authorized_keys
 \end{lstlisting}
 
-W wyniku zapytania z listingu \ref{lst:e2e-stage2} uzyskano wartość statycznego tokenu autoryzacyjnego \texttt{vb-internal-9f8e7d6c5b4a3f2e1d0c} oraz potwierdzono, że serwis wewnętrzny zarządza plikiem \texttt{/home/dev/.ssh/authorized\_keys}.
+W wyniku zapytania z listingu \ref{lst:e2e-stage2} uzyskano wartość tokenu autoryzacyjnego oraz potwierdzono, że serwis wewnętrzny zarządza plikiem \texttt{/home/dev/.ssh/authorized\_keys}.
 
 \section{Etap 3: Komunikacja z lokalnym serwisem Flask i dostęp SSH na konto dev}
 \label{sec:etap3-flask}
 
-Ponieważ serwis Flask nasłuchuje wyłącznie na interfejsie lokalnym (\texttt{127.0.0.1:5000}), komunikację z nim zrealizowano za pośrednictwem wbudowanego w portal WWW parametru mostka lokalnego \texttt{?proxy\_path=}. Przekazując pozyskany w etapie 2 token oraz klucz publiczny SSH analityka, zarejestrowano klucz dla użytkownika \texttt{dev}, a następnie nawiązano interaktywną sesję SSH na porcie \texttt{22/tcp} i odczytano pierwszą flagę.
+Ponieważ serwis Flask nasłuchuje wyłącznie na interfejsie lokalnym (\texttt{127.0.0.1:5000}), komunikację z nim zrealizowano za pośrednictwem wbudowanego w portal WWW parametru mostka lokalnego \texttt{?proxy\_path=}. Przekazując pozyskany w etapie 2 token oraz klucz publiczny SSH analityka, zarejestrowano klucz dla użytkownika \texttt{dev}, a następnie nawiązano sesję SSH na porcie \texttt{22/tcp} i odczytano pierwszą flagę.
 
 \begin{lstlisting}[language=bash, caption={Rejestracja klucza SSH przez lokalne API (127.0.0.1:5000), logowanie SSH i odczyt user.txt}, label={lst:e2e-stage3}]
 $ curl -s "http://192.168.56.101:8080/?proxy_path=/api/v1/info&token=vb-internal-9f8e7d6c5b4a3f2e1d0c"
@@ -111,12 +111,12 @@ Poprawne zalogowanie przez SSH na konto \texttt{dev} oraz odczyt zawartości pli
 \section{Etap 4: Weryfikacja dwóch ścieżek eskalacji do konta root}
 \label{sec:etap4-root}
 
-Z poziomu sesji SSH użytkownika \texttt{dev} zweryfikowano obie zaprojektowane ścieżki prowadzące do uzyskania pełnych uprawnień administracyjnych \texttt{uid=0(root)}.
+Z poziomu sesji SSH użytkownika \texttt{dev} zweryfikowano zaprojektowane ścieżki prowadzące do uzyskania pełnych uprawnień administracyjnych \texttt{root}.
 
 \subsection{Ścieżka A: Zadanie cykliczne Cron i skrypt z uprawnieniami grupy dev}
 \label{subsec:sciezka-a-cron}
 
-Inspekcja zawartości katalogu \path{/opt/admin/hooks/} oraz pliku konfiguracyjnego \path{/etc/cron.d/vulnbox-maintenance} potwierdziła, że skrypt \path{/opt/admin/hooks/pre_backup.sh} posiada uprawnienia \texttt{0775} i grupę \texttt{dev}. Nadpisanie jego zawartości w miejscu (z zachowaniem bitu wykonywalności sprawdzanego przez \texttt{backup\_check.sh}) skutkuje automatycznym wykonaniem polecenia przez demona \texttt{cron} w kolejnej minucie w kontekście \texttt{root}.
+Analiza katalogu \path{/opt/admin/hooks/} oraz pliku konfiguracyjnego \path{/etc/cron.d/vulnbox-maintenance} potwierdziła, że skrypt \path{/opt/admin/hooks/pre_backup.sh} posiada uprawnienia \texttt{0775} i grupę \texttt{dev}. Nadpisanie jego zawartości skutkuje automatycznym wykonaniem polecenia przez demona \texttt{cron} jako \texttt{root}.
 
 \begin{lstlisting}[language=bash, caption={Weryfikacja ścieżki zadaniowej cron (pre\_backup.sh) z poziomu konta dev}, label={lst:e2e-stage4a}]
 dev@vulnbox:~$ cat /etc/cron.d/vulnbox-maintenance
@@ -145,7 +145,7 @@ FLAG{R00t_Pwn3d!9zW6@kL3#bT8_sys%4mX2}
 \subsection{Ścieżka B: Reguła sudoers.d i przechwycenie modułu Pythona}
 \label{subsec:sciezka-b-sudo}
 
-Niezależnie od zadania cyklicznego zweryfikowano regułę \texttt{sudo -l}, która pozwala użytkownikowi \texttt{dev} na uruchomienie \path{/usr/bin/python3} z argumentem \path{/opt/admin/maintenance.py} jako \texttt{root} z zachowaniem zmiennej środowiskowej \texttt{PYTHONPATH} (\texttt{SETENV: NOPASSWD}). Utworzenie pomocniczego modułu \texttt{/tmp/status\_helper.py} i przekazanie ścieżki \texttt{PYTHONPATH=/tmp} powoduje załadowanie modułu w kontekście \texttt{root} i natychmiastowy odczyt flagi \texttt{/root/root.txt}.
+Zweryfikowano regułę \texttt{sudo -l}, która pozwala użytkownikowi \texttt{dev} na uruchomienie \path{/usr/bin/python3} z argumentem \path{/opt/admin/maintenance.py} jako \texttt{root} z zachowaniem zmiennej środowiskowej \texttt{PYTHONPATH} (\texttt{SETENV: NOPASSWD}). Utworzenie pomocniczego modułu \texttt{/tmp/status\_helper.py} i przekazanie ścieżki \texttt{PYTHONPATH=/tmp} powoduje załadowanie modułu jako \texttt{root} i odczyt flagi \texttt{/root/root.txt}.
 
 \begin{lstlisting}[language=bash, caption={Weryfikacja ścieżki sudoers.d z wykorzystaniem zmiennej PYTHONPATH}, label={lst:e2e-stage4b}]
 dev@vulnbox:~$ sudo -l && ls -la /opt/admin/status_helper.py

@@ -5,7 +5,7 @@
 
     % Actors (5 columns with extra width on first span)
     \node[seqactor, minimum width=2.8cm] (a1) at (0, 0) {
-        \textbf{Analityk}\\{\scriptsize Host (\texttt{vboxnet0})}
+        \textbf{Analityk}
     };
     \node[seqactor, minimum width=2.8cm] (a2) at (4.6, 0) {
         \textbf{Samba / SSH}\\{\scriptsize \texttt{:445}, \texttt{:22/tcp}}
@@ -45,6 +45,6 @@
 
     % 5. Administrative privilege elevation (cron / sudoers)
     \draw[flow] (4.6, -8.1) -- node[flowlabel, above=2pt] {\scriptsize \textbf{5.} Wykonanie \texttt{pre\_backup.sh} (\texttt{cron}) / \texttt{maintenance.py} (\texttt{sudo})} (16.0, -8.1);
-    \draw[ctrl] (16.0, -9.0) -- node[flowlabel, above=2pt] {\scriptsize Weryfikacja kontekstu \texttt{uid=0(root)} i odczyt \texttt{/root/root.txt}} (0, -9.0);
+    \draw[ctrl] (16.0, -9.0) -- node[flowlabel, above=2pt] {\scriptsize Weryfikacja kontekstu \texttt{root} i odczyt \texttt{/root/root.txt}} (0, -9.0);
 
 \end{tikzpicture}

@@ -8,14 +8,13 @@
     \node[iconnode] (host) at (0,0) {\AffIcon[1.35cm]{sq_laptop}};
     \node[iconlabel, below=0.25cm of host, text width=3.4cm] (host_lbl) {
         \textbf{Host analityczny}\\
-        {\scriptsize Stacja weryfikacyjna}
     };
 
     % Center-left: VirtualBox Isolated Switch
     \node[iconnode] (switch) at (4.2,0) {\AffIcon[1.35cm]{sq_switch}};
     \node[iconlabel, below=0.25cm of switch, text width=3.6cm] (switch_lbl) {
         \textbf{Sieć laboratoryjna}\\
-        {\scriptsize VirtualBox (\texttt{vboxnet0})}
+        {\scriptsize \texttt{vboxnet0} \texttt{192.168.56.0/24}}
     };
 
     % Center-right: Perimeter Firewall inside VulnBox
@@ -36,13 +35,13 @@
     \coordinate (zone_nw) at (7.4, 1.55);
     \coordinate (zone_se) at (15.2, -1.95);
     \draw[zone] (zone_nw) rectangle (zone_se);
-    \node[font=\sffamily\footnotesize\bfseries, text=acadMuted, anchor=north west] at (7.55, 1.45) {
-        Maszyna wirtualna VulnBox (\texttt{VulnBox.ova})
+    \node[font=\sffamily\footnotesize\bfseries, text=acadMuted, anchor=north west] at (8.8, 1.45) {
+        Maszyna wirtualna VulnBox
     };
 
     % Connections
-    \draw[flow, <->] (host.east) -- node[flowlabel, above=4pt] {Ruch testowy} (switch.west);
-    \draw[flow, <->] (switch.east) -- node[flowlabel, above=4pt, pos=0.42] {\texttt{192.168.56.0/24}} (fw.west);
-    \draw[flow, <->] (fw.east) -- node[flowlabel, above=4pt] {Usługi lokalne} (vm.west);
+    \draw[flow, <->] (host.east) -- node[flowlabel, above=4pt] {} (switch.west);
+    \draw[flow, <->] (switch.east) -- node[flowlabel, above=4pt, pos=0.42] {} (fw.west);
+    \draw[flow, <->] (fw.east) -- node[flowlabel, above=4pt] {} (vm.west);
 
 \end{tikzpicture}

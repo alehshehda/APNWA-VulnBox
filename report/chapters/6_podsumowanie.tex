@@ -1,12 +1,12 @@
 \chapter{Podsumowanie}
 \label{chap:podsumowanie}
 
-W ramach zrealizowanego projektu zaprojektowano, skonfigurowano oraz zweryfikowano kompletną maszynę wirtualną \textbf{VulnBox} opartą na systemie \textbf{Ubuntu Server 26.04.1 LTS}, spełniającą wszystkie wymagania funkcjonalne i bezpieczeństwa określone w specyfikacji zadania projektowego.
+W ramach projektu zaprojektowano, skonfigurowano oraz zweryfikowano maszynę wirtualną \textbf{VulnBox} opartą na systemie \textbf{Ubuntu Server 26.04.1 LTS}, spełniającą wszystkie wymagania funkcjonalne i bezpieczeństwa określone w specyfikacji zadania.
 
 \section{Macierz zgodności z wymaganiami projektowymi}
 \label{sec:macierz-zgodnosci}
 
-Tabela \ref{tab:macierz-zgodnosci} przedstawia zbiorcze podsumowanie weryfikacji poszczególnych wymagań technicznych wraz ze wskazaniem miejsca ich udokumentowania oraz wynikiem testów akceptacyjnych.
+Tabela \ref{tab:macierz-zgodnosci} przedstawia zbiorcze podsumowanie weryfikacji poszczególnych wymagań technicznych wraz ze wskazaniem miejsca ich udokumentowania oraz wynikiem testów.
 
 \begin{table}[H]
     \centering
@@ -32,9 +32,9 @@ Tabela \ref{tab:macierz-zgodnosci} przedstawia zbiorcze podsumowanie weryfikacji
 \section{Wnioski końcowe}
 \label{sec:wnioski}
 
-Realizacja projektu potwierdziła, że przygotowanie dydaktycznej maszyny wirtualnej wymaga rygorystycznego oddzielenia celowo zaprojektowanych słabości aplikacyjnych od zabezpieczeń samego systemu operacyjnego i procesu rozruchowego:
+Realizacja projektu potwierdziła, że przygotowanie maszyny wirtualnej wymaga oddzielenia celowo zaprojektowanych słabości aplikacyjnych od zabezpieczeń samego systemu operacyjnego i procesu rozruchowego:
 \begin{enumerate}
-    \item \textbf{Powtarzalność i automatyzacja wdrożenia:} Oparcie konfiguracji na repozytorium kodu (\emph{Infrastructure as Code}) zawierającym szczegółową instrukcję budowy (\texttt{box/SETUP.md}), przewodnik weryfikacyjny (\texttt{box/WALKTHROUGH.md}) oraz odpowiadające im skrypty \texttt{provision\_vm.sh}, \texttt{verify\_vm.sh} i \texttt{cleanup\_vm.sh} pozwala na odtworzenie identycznego obrazu maszyny w dowolnym momencie oraz automatyczną walidację usług w potoku CI/CD (\texttt{box-ci.yml}).
-    \item \textbf{Realizm wielowarstwowej ścieżki weryfikacji:} Połączenie czterech odmiennych technologii (udział plikowy SMB, aplikacja PHP z błędem normalizacji ścieżek CWE-22, odizolowany na interfejsie \texttt{127.0.0.1} serwis Flask oraz błędy uprawnień w zadaniach \texttt{cron} i regułach \texttt{sudoers.d}) wymusza przeprowadzenie pełnego procesu analitycznego od rekonesansu po weryfikację uprawnień lokalnych.
-    \item \textbf{Odporność obrazu dystrybucyjnego (\texttt{VulnBox.ova}):} Zastosowanie uniwersalnych reguł Netplan niewrażliwych na zmianę adresu MAC oraz zabezpieczenie programu rozruchowego GRUB2 skrótem PBKDF2 gwarantują, że maszyna uruchamia się bezobsługowo po imporcie w programie VirtualBox, nie pozwalając przy tym na obejście ścieżki projektowej przez edycję parametrów startowych jądra.
+    \item \textbf{Powtarzalność i automatyzacja wdrożenia:} Oparcie konfiguracji na \textit{Infrastructure as Code} zawierającym szczegółową instrukcję budowy (\texttt{box/SETUP.md}), przewodnik weryfikacyjny (\texttt{box/WALKTHROUGH.md}) oraz odpowiadające im skrypty \texttt{provision\_vm.sh}, \texttt{verify\_vm.sh} i \texttt{cleanup\_vm.sh} pozwala na odtworzenie identycznego obrazu maszyny w dowolnym momencie oraz automatyczną walidację usług w potoku CI/CD (\texttt{box-ci.yml}).
+    \item \textbf{Realizm ścieżki weryfikacji:} Połączenie czterech odmiennych technologii (udział plikowy SMB, aplikacja PHP z błędem normalizacji ścieżek CWE-22, odizolowany na interfejsie \texttt{127.0.0.1} serwis Flask oraz błędy uprawnień w zadaniach \texttt{cron} i regułach \texttt{sudoers.d}) wymusza przeprowadzenie pełnego procesu analitycznego od rekonesansu po weryfikację uprawnień lokalnych.
+    \item \textbf{Odporność obrazu dystrybucyjnego (\texttt{VulnBox.ova}):} Zastosowanie uniwersalnych reguł Netplan niewrażliwych na zmianę adresu MAC oraz zabezpieczenie GRUB2 skrótem PBKDF2 gwarantują, że maszyna uruchamia się bezobsługowo po imporcie w programie VirtualBox, nie pozwalając przy tym na obejście ścieżki przez edycję parametrów startowych jądra.
 \end{enumerate}

@@ -1,12 +1,12 @@
 \chapter{Konfiguracja systemu i usług}
 \label{chap:konfiguracja}
 
-W niniejszym rozdziale przedstawiono szczegółową konfigurację techniczną systemu bazowego \textbf{Ubuntu Server 26.04.1 LTS} oraz poszczególnych usług składających się na maszynę \textbf{VulnBox}. Dla każdej warstwy omówiono zarówno zastosowane mechanizmy zabezpieczające (hardening rozruchu i zapory sieciowej), jak i celowo wprowadzone słabości konfiguracyjne wykorzystywane podczas testów weryfikacyjnych.
+W niniejszym rozdziale przedstawiono szczegółową konfigurację systemu bazowego \textbf{Ubuntu Server 26.04.1 LTS} oraz poszczególnych usług maszyny \textbf{VulnBox}. Dla każdej warstwy omówiono zarówno zastosowane mechanizmy zabezpieczające (hardening rozruchu i zapory sieciowej), jak i celowo wprowadzone słabości konfiguracyjne wykorzystywane podczas testów weryfikacyjnych.
 
 \section{Zestawienie usług, portów i kont systemowych}
 \label{sec:zestawienie-portow}
 
-Tabela \ref{tab:macierz-uslug} podsumowuje wszystkie usługi uruchomione na maszynie \texttt{vulnbox}, ich gniazda sieciowe, status na zaporze UFW oraz przypisane konta wykonawcze.
+Tabela \ref{tab:macierz-uslug} przedstawia wszystkie usługi uruchomione na maszynie \texttt{vulnbox}, ich gniazda sieciowe, status na zaporze UFW oraz przypisane konta wykonawcze.
 
 \begin{table}[H]
     \centering
@@ -51,13 +51,13 @@ network:
       optional: true
 \end{lstlisting}
 
-Zgodnie z wymaganiami bezpieczeństwa fizycznej i wirtualnej konsoli, program rozruchowy \textbf{GRUB2} został zabezpieczony przed uruchomieniem systemu w trybie jednego użytkownika (\emph{Single User Mode} / edycja parametrów jądra \texttt{init=/bin/sh}) \cite{grub2}. W pliku \texttt{/etc/grub.d/40\_custom} zdefiniowano konto superużytkownika \texttt{admin} oraz skrót hasła wygenerowany narzędziem \texttt{grub-mkpasswd-pbkdf2}. Aby maszyna uruchamiała się całkowicie bezobsługowo po włączeniu zasilania, wpisom systemowym w \texttt{/boot/grub/grub.cfg} przypisano atrybut \texttt{--unrestricted}, dzięki czemu hasło wymagane jest wyłącznie podczas próby edycji wpisu klawiszem \texttt{e} lub wejścia do wiersza poleceń GRUB klawiszem \texttt{c}.
+Zgodnie z wymaganiami bezpieczeństwa wirtualnej konsoli, program \textbf{GRUB2} został zabezpieczony przed uruchomieniem systemu w trybie Single User Mode \cite{grub2}. W pliku \texttt{/etc/grub.d/40\_custom} zdefiniowano konto superużytkownika \texttt{admin} oraz skrót hasła wygenerowany narzędziem \texttt{grub-mkpasswd-pbkdf2}. Aby maszyna uruchamiała się całkowicie bezobsługowo po włączeniu zasilania, wpisom systemowym w \texttt{/boot/grub/grub.cfg} przypisano \texttt{--unrestricted}, dzięki czemu hasło wymagane jest wyłącznie podczas próby edycji wpisu klawiszem \texttt{e} lub wejścia do wiersza poleceń GRUB klawiszem \texttt{c}.
 
 \begin{lstlisting}[language=bash, caption={Konfiguracja blokady GRUB2 w pliku /etc/grub.d/40\_custom}, label={lst:grub}]
 #!/bin/sh
 exec tail -n +3 $0
 set superusers="admin"
-# Skrót PBKDF2-SHA512 (wersja skrócona na potrzeby listingu; pełny skrót w box/configs/40_custom_grub)
+# Skrót PBKDF2-SHA512 (wersja skrócona; pełny skrót w box/configs/40_custom_grub)
 password_pbkdf2 admin grub.pbkdf2.sha512.10000.48E259E540E02F32...AB8BE46640062AFDF405E13F...E88E81E42C8EE
 \end{lstlisting}
 
@@ -66,12 +66,12 @@ password_pbkdf2 admin grub.pbkdf2.sha512.10000.48E259E540E02F32...AB8BE46640062A
 
 Polityka filtracji pakietów realizowana przez skrypt \texttt{box/configs/ufw-rules.sh} ustawia domyślną regułę odrzucania połączeń przychodzących (\texttt{ufw default deny incoming}) i zezwala wyłącznie na ruch TCP do trzech usług zewnętrznych: \texttt{22/tcp} (SSH), \texttt{445/tcp} (Samba) oraz \texttt{8080/tcp} (Nginx) \cite{ufw}. Dzięki temu port \texttt{5000/tcp} wewnętrznego serwisu Flask pozostaje całkowicie odizolowany od sieci \texttt{vboxnet0}.
 
-Równolegle usługa \textbf{Fail2Ban} (\texttt{/etc/fail2ban/jail.local}) monitoruje dziennik systemowy \texttt{systemd-journald} (\texttt{backend = systemd}) dla demona \texttt{sshd}. Przekroczenie limitu \texttt{maxretry = 5} nieudanych prób uwierzytelnienia w oknie czasowym \texttt{findtime = 10m} skutkuje automatyczną blokadą adresu IP źródłowego na czas \texttt{bantime = 15m} \cite{fail2ban}.
+Równolegle usługa \textbf{Fail2Ban} (\texttt{/etc/fail2ban/jail.local}) monitoruje dziennik systemowy \texttt{systemd-journald} dla demona \texttt{sshd}. Przekroczenie limitu \texttt{maxretry = 5} nieudanych prób uwierzytelnienia w oknie czasowym \texttt{findtime = 10m} skutkuje automatyczną blokadą adresu IP źródłowego na czas \texttt{bantime = 15m} \cite{fail2ban}.
 
 \section{Etap 1: Konfiguracja usługi Samba i słabość ekspozycji metadanych}
 \label{sec:konfiguracja-samba}
 
-Pierwszym elementem ścieżki weryfikacyjnej jest serwer plikowy Samba skonfigurowany w pliku \texttt{/etc/samba/smb.conf} \cite{samba}. W sekcji globalnej aktywowano parametr \texttt{map to guest = Bad User}, który mapuje nieznane lub anonimowe logowania na domyślne konto gościa (\texttt{nobody}), natomiast dla zasobu \texttt{[public]} wskazującego na katalog \texttt{/srv/samba/public} włączono wyłącznie dostęp gościnny (\texttt{guest ok = yes}, \texttt{guest only = yes}) z blokadą zapisu (\texttt{read only = yes}).
+Pierwszym elementem ścieżki jest serwer plikowy Samba skonfigurowany w pliku \texttt{/etc/samba/smb.conf} \cite{samba}. W sekcji globalnej aktywowano parametr \texttt{map to guest = Bad User}, który mapuje nieznane lub anonimowe logowania na domyślne konto gościa (\texttt{nobody}), natomiast dla zasobu \texttt{[public]} wskazującego na katalog \texttt{/srv/samba/public} włączono wyłącznie dostęp gościnny (\texttt{guest ok = yes}, \texttt{guest only = yes}) z blokadą zapisu (\texttt{read only = yes}).
 
 \begin{lstlisting}[language=bash, caption={Definicja anonimowego udziału public w pliku /etc/samba/smb.conf}, label={lst:smb-conf}]
 [global]
@@ -95,16 +95,16 @@ Pierwszym elementem ścieżki weryfikacyjnej jest serwer plikowy Samba skonfigur
    guest only = yes
 \end{lstlisting}
 
-\textbf{Analiza słabości konfiguracyjnej (Etap 1):} Sama obecność publicznego udziału SMB nie umożliwia wykonania kodu, jednak umieszczony w nim plik \texttt{deployment-notes.txt} zawiera wewnętrzną dokumentację operacyjną pozostawioną po wdrożeniu. Ujawnia ona dokładną lokalizację kodu źródłowego portalu diagnostycznego (\texttt{/var/www/vulnbox/index.php}), ścieżkę pliku konfiguracyjnego lokalnego API (\texttt{/opt/internal\_api/config.ini}) oraz adres gniazda pętli zwrotnej (\texttt{127.0.0.1:5000}).
+\textbf{Analiza słabości konfiguracyjnej (Etap 1):} Sama obecność publicznego udziału SMB nie umożliwia wykonania kodu, jednak umieszczony w nim plik \texttt{deployment-notes.txt} zawiera wewnętrzną dokumentację pozostawioną po wdrożeniu. Ujawnia ona dokładną lokalizację kodu źródłowego portalu diagnostycznego (\texttt{/var/www/vulnbox/index.php}), ścieżkę pliku konfiguracyjnego lokalnego API (\texttt{/opt/internal\_api/config.ini}) oraz adres gniazda loopback (\texttt{127.0.0.1:5000}).
 
 \section{Etap 2: Serwer Nginx + PHP-FPM i błąd normalizacji ścieżek}
 \label{sec:konfiguracja-web}
 
-Na porcie \texttt{8080/tcp} nasłuchuje serwer HTTP Nginx (\path{/etc/nginx/sites-available/vulnbox.conf}), który przekazuje żądania kierowane do skryptów PHP do puli procesów PHP-FPM za pośrednictwem niezależnego od wersji interpretera gniazda UNIX \path{unix:/run/php/php-fpm.sock} \cite{nginx}. Procesy robocze działają z uprawnieniami systemowego konta \texttt{www-data}.
+Na porcie \texttt{8080/tcp} nasłuchuje serwer HTTP Nginx (\path{/etc/nginx/sites-available/vulnbox.conf}), który przekazuje żądania kierowane do skryptów PHP do puli procesów PHP-FPM za pośrednictwem niezależnego od wersji interpretera gniazda UNIX \path{unix:/run/php/php-fpm.sock} \cite{nginx}. Procesy działają z uprawnieniami systemowego konta \texttt{www-data}.
 
 Główny moduł aplikacji (\path{/var/www/vulnbox/index.php}) udostępnia dwa parametry diagnostyczne:
 \begin{itemize}
-    \item \texttt{?log=<nazwa\_pliku>} - odczyt plików dziennika z katalogu bazowego \path{/var/log/webapp/},
+    \item \texttt{?log=<nazwa\_pliku>} - odczyt plików dziennika z katalogu \path{/var/log/webapp/},
     \item \texttt{?proxy\_path=<ścieżka>\&token=<wartość>} - lokalny mostek HTTP przekazujący zapytania diagnostyczne z poziomu procesu \texttt{www-data} do serwisu nasłuchującego pod adresem \texttt{http://127.0.0.1:5000}.
 \end{itemize}
 
@@ -147,12 +147,12 @@ def register_ssh_key():
     return jsonify({"status": "registered", "account": "dev", "authorized_keys_path": str(target_file)})
 \end{lstlisting}
 
-\textbf{Analiza słabości konfiguracyjnej (Etap 3):} Bezpieczeństwo punktu końcowego \texttt{POST /api/v1/ssh-key} opiera się na dwóch założeniach: izolacji sieciowej gniazda \texttt{127.0.0.1:5000} oraz poufności statycznego tokenu \texttt{X-Internal-Token} przechowywanego w pliku \texttt{/opt/internal\_api/config.ini}. Połączenie błędu odczytu plików z etapu 2 (ujawnienie tokenu \texttt{vb-internal-9f8e7d6c5b4a3f2e1d0c}) z funkcją mostka lokalnego \texttt{?proxy\_path=} w portalu WWW pozwala na przesłanie prawidłowo uwierzytelnionego żądania z wnętrza samego hosta \texttt{vulnbox} i dopisanie klucza publicznego analityka do pliku \texttt{/home/dev/.ssh/authorized\_keys}. Ponieważ konto \texttt{dev} ma zablokowane logowanie hasłem (\texttt{passwd -l dev}), uwierzytelnianie kluczem SSH staje się jedynym i w pełni wystarczającym sposobem uzyskania powłoki lokalnej.
+\textbf{Analiza słabości konfiguracyjnej (Etap 3):} Bezpieczeństwo punktu końcowego \texttt{POST /api/v1/ssh-key} opiera się na dwóch założeniach: izolacji sieciowej gniazda \texttt{127.0.0.1:5000} oraz poufności statycznego tokenu \texttt{X-Internal-Token} przechowywanego w pliku \texttt{/opt/internal\_api/config.ini}. Połączenie błędu odczytu plików z etapu 2 z funkcją mostka lokalnego \texttt{?proxy\_path=} w portalu WWW pozwala na przesłanie prawidłowo uwierzytelnionego żądania z wnętrza samego hosta \texttt{vulnbox} i dopisanie klucza publicznego analityka do pliku \texttt{/home/dev/.ssh/authorized\_keys}. Ponieważ konto \texttt{dev} ma zablokowane logowanie hasłem (\texttt{passwd -l dev}), uwierzytelnianie kluczem SSH staje się jedynym sposobem uzyskania powłoki lokalnej.
 
 \section{Etap 4 i 5: Zadania cykliczne Cron oraz polityka Sudoers}
 \label{sec:konfiguracja-privesc}
 
-Po uzyskaniu dostępu SSH na konto \texttt{dev} (gdzie znajduje się pierwsza flaga \texttt{/home/dev/user.txt} z uprawnieniami \texttt{0600}), w systemie skonfigurowano dwie niezależne słabości administracyjne umożliwiające przejście do kontekstu \texttt{root}:
+Po uzyskaniu dostępu do konta \texttt{dev} (gdzie znajduje się flaga \texttt{/home/dev/user.txt}), w systemie skonfigurowano dwie niezależne słabości umożliwiające przejście do \texttt{roota}:
 
 \begin{lstlisting}[language=bash, caption={Konfiguracja pliku vulnbox-maintenance (cron) oraz reguły 90-dev-admin (sudoers.d)}, label={lst:cron-sudoers}]
 # /etc/cron.d/vulnbox-maintenance (uprawnienia 0644, root:root)
@@ -166,6 +166,6 @@ dev ALL=(root) NOPASSWD: SETENV: /usr/bin/python3 /opt/admin/maintenance.py
 \end{lstlisting}
 
 \begin{enumerate}
-    \item \textbf{Ścieżka A (modyfikacja skryptu hooka w zadaniu \texttt{cron}):} Zadanie w pliku \path{/etc/cron.d/vulnbox-maintenance} uruchamia co minutę z uprawnieniami \texttt{root} skrypt \path{/opt/admin/backup_check.sh}, który sprawdza prawo wykonania (\texttt{-x}) i uruchamia plik \path{/opt/admin/hooks/pre_backup.sh}. Plik \texttt{pre\_backup.sh} posiada właściciela \texttt{root:dev} oraz uprawnienia \texttt{0775} (\texttt{rwxrwxr-x}), co pozwala członkom grupy \texttt{dev} na nadpisanie zawartości pliku z zachowaniem bitu wykonywalności i automatyczne uruchomienie poleceń przez demona \texttt{cron} jako \texttt{root}.
-    \item \textbf{Ścieżka B (przechwycenie modułu Pythona przez \texttt{sudoers.d}):} Reguła zdefiniowana w \path{/etc/sudoers.d/90-dev-admin} \cite{sudoers} łączy opcje \texttt{env\_keep += "PYTHONPATH"} oraz \texttt{NOPASSWD: SETENV} dla polecenia \path{/usr/bin/python3} z argumentem \path{/opt/admin/maintenance.py}. Dodatkowo sam skrypt \texttt{maintenance.py} celowo usuwa katalog \path{/opt/admin} z początku listy \texttt{sys.path} i dopisuje go na jej końcu, tak aby katalogi przekazane przez \texttt{PYTHONPATH} miały pierwszeństwo przy instrukcji \texttt{import status\_helper}. Niezależnie od tego sam plik \path{/opt/admin/status_helper.py} ma uprawnienia \texttt{0664} (\texttt{root:dev}). Użytkownik \texttt{dev} może więc utworzyć własny moduł w \path{/tmp/status_helper.py} i uruchomić \texttt{sudo PYTHONPATH=/tmp /usr/bin/python3 /opt/admin/maintenance.py} (lub zmodyfikować plik bezpośrednio), uzyskując natychmiastowe wykonanie kodu jako \texttt{uid=0(root)} i odczyt pliku \path{/root/root.txt}.
+    \item \textbf{Ścieżka A (modyfikacja skryptu hooka w zadaniu \texttt{cron}):} Zadanie w pliku \path{/etc/cron.d/vulnbox-maintenance} uruchamia co minutę z uprawnieniami \texttt{root} skrypt \path{/opt/admin/backup_check.sh}, który sprawdza prawo wykonania (\texttt{-x}) i uruchamia plik \path{/opt/admin/hooks/pre_backup.sh}. Plik \texttt{pre\_backup.sh} posiada właściciela \texttt{root:dev} oraz uprawnienia \texttt{0775}, co pozwala członkom grupy \texttt{dev} na nadpisanie zawartości pliku z zachowaniem bitu wykonywalności i automatyczne uruchomienie poleceń przez demona \texttt{cron} jako \texttt{root}.
+    \item \textbf{Ścieżka B (przechwycenie modułu Pythona przez \texttt{sudoers.d}):} Reguła zdefiniowana w \path{/etc/sudoers.d/90-dev-admin} \cite{sudoers} łączy opcje \texttt{env\_keep += "PYTHONPATH"} oraz \texttt{NOPASSWD: SETENV} dla polecenia \path{/usr/bin/python3} z argumentem \path{/opt/admin/maintenance.py}. Dodatkowo sam skrypt \texttt{maintenance.py} celowo usuwa katalog \path{/opt/admin} z początku listy \texttt{sys.path} i dopisuje go na jej końcu, tak aby katalogi przekazane przez \texttt{PYTHONPATH} miały pierwszeństwo przy instrukcji \texttt{import status\_helper}. Niezależnie od tego sam plik \path{/opt/admin/status_helper.py} ma uprawnienia \texttt{0664} (\texttt{root:dev}). Użytkownik \texttt{dev} może więc utworzyć własny moduł w \path{/tmp/status_helper.py} i uruchomić \texttt{sudo PYTHONPATH=/tmp /usr/bin/python3 /opt/admin/maintenance.py} (lub zmodyfikować plik bezpośrednio), uzyskując natychmiastowe wykonanie kodu jako \texttt{root} i odczyt pliku \path{/root/root.txt}.
 \end{enumerate}
