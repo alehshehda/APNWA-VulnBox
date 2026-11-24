@@ -8,7 +8,7 @@ Przedmiotem dokumentacji jest zaprojektowanie, wdrożenie oraz kompleksowa weryf
 
 Projekt obejmuje warstwę inżynieryjną samej maszyny wirtualnej eksportowanej do formatu \texttt{VulnBox.ova} \cite{ovf20} oraz zestaw zautomatyzowanych skryptów wdrożeniowych i audytowych utrzymywanych w repozytorium projektu \cite{vulnbox_repo}. Architektura \texttt{VulnBox} została zaprojektowana tak, aby każdy etap weryfikacji wynikał bezpośrednio z błędów konfiguracji konkretnych usług systemowych lub aplikacyjnych, przy jednoczesnym zachowaniu pełnej odporności samego systemu bazowego na nieautoryzowane modyfikacje z poziomu konsoli wirtualizatora.
 
-W ramach realizacji projektu wyodrębniono następujące zadania szczegółowe:
+W ramach realizacji projektu zdefiniowano następujące zadania:
 \begin{enumerate}
     \item Przygotowanie bazowego obrazu systemu \textbf{Ubuntu Server 26.04.1 LTS} (\texttt{amd64}) w hiperwizorze Oracle VirtualBox pod nazwą \texttt{VulnBox} (nazwa hosta \texttt{vulnbox}).
     \item Skonfigurowanie warstwy sieciowej z wykorzystaniem \textbf{Netplan} w sposób zapewniający bezobsługowe pobieranie adresacji IP przez protokół DHCP niezależnie od identyfikatora karty sieciowej po imporcie pliku \texttt{VulnBox.ova}.
@@ -17,10 +17,10 @@ W ramach realizacji projektu wyodrębniono następujące zadania szczegółowe:
     \item Przeprowadzenie pełnej weryfikacji manualnej (\emph{End-to-End}) oraz automatycznej przy użyciu skryptu audytowego \texttt{verify\_vm.sh}, połączonej z procedurą czyszczenia obrazu (\texttt{cleanup\_vm.sh}) przed eksportem do pliku \texttt{VulnBox.ova}.
 \end{enumerate}
 
-\section{Wymagania projektowe i założenia konstrukcyjne}
+\section{Wymagania projektowe i założenia}
 \label{sec:wymagania-konstrukcyjne}
 
-W tabeli \ref{tab:wymagania-bazowe} zestawiono kluczowe wymagania obligatoryjne stawiane maszynie wirtualnej \texttt{VulnBox} wraz z przyjętym w projekcie sposobem ich technicznej realizacji.
+W tabeli \ref{tab:wymagania-bazowe} zestawiono kluczowe wymagania stawiane maszynie wirtualnej \texttt{VulnBox} wraz z przyjętym w projekcie sposobem ich technicznej realizacji.
 
 \begin{table}[H]
     \centering
@@ -45,7 +45,7 @@ W tabeli \ref{tab:wymagania-bazowe} zestawiono kluczowe wymagania obligatoryjne 
 \section{Struktura repozytorium projektowego}
 \label{sec:struktura-repo}
 
-Wszystkie kody źródłowe, konfiguracje usług oraz dokumentacja projektu są utrzymywane w publicznym repozytorium GitHub (\url{https://github.com/alehshehda/APNWA-VulnBox}) \cite{vulnbox_repo} podzielonym na dwa główne moduły oraz potoki automatyzacji CI/CD (\texttt{.github/workflows/}):
+Wszystkie kody źródłowe, konfiguracje usług oraz dokumentacja projektu są utrzymywane w publicznym repozytorium GitHub (\url{https://github.com/alehshehda/APNWA-VulnBox}) \cite{vulnbox_repo} podzielonym na dwa główne moduły oraz potoki CI/CD:
 \begin{itemize}
     \item \texttt{report/} - źródła niniejszej dokumentacji projektowej w systemie \LaTeX{} kompilowane automatycznie przez potok \texttt{compile.yml} do pliku \texttt{APNWA-VulnBox.pdf} publikowanego w GitHub Releases oraz GitHub Pages,
     \item \texttt{box/} - kompletny pakiet wdrożeniowy maszyny wirtualnej \texttt{VulnBox}, obejmujący dokumentację instalacyjną \texttt{box/SETUP.md}, przewodnik weryfikacyjny \texttt{box/WALKTHROUGH.md}, pliki konfiguracyjne usług (\texttt{box/configs/}), kod źródłowy komponentów (\texttt{box/src/}) oraz skrypty automatyzujące budowę, weryfikację i czyszczenie systemu (\texttt{box/scripts/}), walidowane dodatkowo w potoku \texttt{box-ci.yml}.

