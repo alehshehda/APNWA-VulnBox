@@ -64,6 +64,6 @@ Project developed for the **Advanced Pentesting of Networks and Web Applications
 
 ---
 
-## Compilation & Local Validation
+## Compilation
 
 The report is automatically compiled to **`APNWA-VulnBox.pdf`** and published to GitHub Releases and GitHub Pages on every push to `main`.
