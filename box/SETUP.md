@@ -14,11 +14,11 @@ For the post-export E2E verification walkthrough (`0-knowledge` to `root`), see 
 | **Hostname** | `vulnbox` |
 | **Operating System** | Ubuntu Server 26.04.1 LTS (64-bit, Server install image without GUI) |
 | **CPU / RAM / Disk** | 1 vCPU, 2 GB RAM, 12 GB dynamically allocated VDI |
-| **Adapter 1 (NAT)** | Enabled only during OS/package installation (disabled or detached before `.ova` export) |
+| **Adapter 1 (NAT)** | Enabled only during OS/package installation (detached before export) |
 | **Adapter 2 (Host-Only)** | `vboxnet0` (`192.168.56.0/24`), VM IP via DHCP |
 | **Export Target** | `VulnBox.ova` (Open Virtualization Format 2.0) |
 
-> **VirtualBox Host-Only DHCP Check:** Before booting the exported lab image, verify in VirtualBox (`Tools -> Network -> Host-only Networks -> vboxnet0 -> DHCP Server`) that the built-in DHCP server is enabled for `192.168.56.0/24` (typically assigning `192.168.56.101` upward). Because `01-netcfg.yaml` sets `optional: true`, an interface without an active DHCP server will not block boot, but will have no IPv4 address.
+> **VirtualBox Host-Only DHCP Check:** Before booting the exported lab image, verify in VirtualBox (`Tools -> Network -> Host-only Networks -> vboxnet0 -> DHCP Server`) that the built-in DHCP server is enabled for `192.168.56.0/24`. Since `01-netcfg.yaml` sets `optional: true`, an interface without an active DHCP server will not block boot, but will have no IPv4 address.
 
 ---
 
@@ -51,7 +51,7 @@ Every step below mirrors the exact actions automated in [provision_vm.sh](script
 
 ### Step 3.1. Hostname and Package Installation
 
-Set the local hostname to `vulnbox`, map `127.0.1.1` in `/etc/hosts`, and install the minimal service footprint (without recommended GUI bloat):
+Set the local hostname to `vulnbox`, map `127.0.1.1` in `/etc/hosts`, and install the minimal service footprint:
 
 ```bash
 sudo hostnamectl set-hostname vulnbox
@@ -59,14 +59,12 @@ sudo sed -i 's/^127\.0\.1\.1[[:space:]].*/127.0.1.1\tvulnbox/' /etc/hosts
 grep -qE '^127\.0\.1\.1[[:space:]]' /etc/hosts || printf '127.0.1.1\tvulnbox\n' | sudo tee -a /etc/hosts >/dev/null
 
 sudo apt-get update
-sudo apt-get install -y --no-install-recommends \
-    openssh-server ufw fail2ban python3-systemd samba nginx \
-    php-fpm python3 python3-flask cron curl nano
+sudo apt-get install -y --no-install-recommends openssh-server ufw fail2ban python3-systemd samba nginx php-fpm python3 python3-flask cron curl nano
 ```
 
 ### Step 3.2. User Account `dev` and Verification Flags
 
-Create the unprivileged `dev` account and lock its password (`passwd -l dev`) so password-based SSH authentication is disabled while public-key SSH authentication remains permitted. Create `/home/dev/.ssh/authorized_keys` (`0600`) and place both 32-character verification flags with strict `0600` permissions:
+Create the unprivileged `dev` account and lock its password (`passwd -l dev`) so password-based SSH authentication is disabled while public-key SSH authentication remains permitted. Create `/home/dev/.ssh/authorized_keys` and place both 32-character verification flags with strict `0600` permissions:
 
 ```bash
 sudo useradd -m -s /bin/bash dev
@@ -85,13 +83,11 @@ sudo chmod 0600 /root/root.txt
 
 ### Step 3.3. Network Configuration (Netplan) and GRUB2 Protection
 
-1. Disable `cloud-init` network overrides (if `cloud-init` is present) so it does not regenerate `50-cloud-init.yaml` after reboot, remove installer Netplan files that pin the original MAC/interface name, and deploy `box/configs/01-netcfg.yaml` (`0600`). Running `netplan generate` prepares the config without breaking an active installer SSH session mid-setup (it takes effect automatically on reboot).
+1. Disable `cloud-init` network overrides so it does not regenerate `50-cloud-init.yaml` after reboot, remove installer Netplan files that pin the original MAC/interface name, and deploy `box/configs/01-netcfg.yaml`. Running `netplan generate` prepares the config without breaking an active installer SSH session mid-setup.
 2. Deploy `box/configs/40_custom_grub` (`PBKDF2-SHA512` superuser password), disable recovery mode entries (`GRUB_DISABLE_RECOVERY="true"`), and add `--unrestricted` to normal Linux menu entries in `/etc/grub.d/10_linux` so normal boot remains unattended while editing kernel parameters (`e`) or entering the GRUB shell (`c`) requires authentication:
 
 ```bash
-if [ -d /etc/cloud/cloud.cfg.d ] \
-    && [ ! -f /etc/cloud/cloud-init.disabled ] \
-    && [ ! -f /etc/cloud/cloud.cfg.d/00-subiquity-disable-cloudinit-networking.cfg ]; then
+if [ -d /etc/cloud/cloud.cfg.d ] && [ ! -f /etc/cloud/cloud-init.disabled ] && [ ! -f /etc/cloud/cloud.cfg.d/00-subiquity-disable-cloudinit-networking.cfg ]; then
     printf 'network: {config: disabled}\n' | sudo tee /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg >/dev/null
 fi
 sudo rm -f /etc/netplan/00-installer-config.yaml /etc/netplan/50-cloud-init.yaml
@@ -110,9 +106,7 @@ sudo update-grub
 
 ### Step 3.4. Perimeter Defense (UFW and Fail2Ban)
 
-Install `box/configs/jail.local` (`sshd` protection via `systemd` journal backend) and run `box/configs/ufw-rules.sh` to enforce `default deny incoming` while allowing only `22/tcp`, `445/tcp`, and `8080/tcp` (`127.0.0.1:5000` stays unreachable externally).
-
-> **Note if provisioning over SSH:** `ufw-rules.sh` runs `ufw --force reset` briefly before enabling `22/tcp`, which takes under a second locally but is safest on the VirtualBox console.
+Install `box/configs/jail.local` (`sshd` protection via `systemd` journal backend) and run `box/configs/ufw-rules.sh` to enforce `default deny incoming` while allowing only `22/tcp`, `445/tcp`, and `8080/tcp`.
 
 ```bash
 sudo install -m 0644 -o root -g root box/configs/jail.local /etc/fail2ban/jail.local
@@ -149,7 +143,7 @@ sudo nginx -t
 
 ### Step 3.7. Stage 3 Service: Internal Management API (`127.0.0.1:5000`)
 
-Deploy `/opt/internal_api/app.py`, `/opt/internal_api/config.ini` (`0640 root:www-data`), and `flask-internal.service`. Notice that `flask-internal.service` runs under `User=dev` so it can append keys to `/home/dev/.ssh/authorized_keys`, while also setting `SupplementaryGroups=www-data` so both the Flask service and Nginx/PHP (`www-data`) can read `config.ini`:
+Deploy `/opt/internal_api/app.py`, `/opt/internal_api/config.ini`, and `flask-internal.service`. Notice that `flask-internal.service` runs under `User=dev` so it can append keys to `/home/dev/.ssh/authorized_keys`, while also setting `SupplementaryGroups=www-data` so both the Flask service and Nginx/PHP (`www-data`) can read `config.ini`:
 
 ```bash
 sudo install -d -m 0755 -o root -g www-data /opt/internal_api
@@ -160,7 +154,7 @@ sudo install -m 0644 -o root -g root box/configs/flask-internal.service /etc/sys
 
 ### Step 3.8. Stage 4 & 5 Services: Scheduled Cron Task and Sudoers Policy
 
-Deploy `/opt/admin/` scripts (`pre_backup.sh` with `0775 root:dev` and `status_helper.py` with `0664 root:dev`), `/etc/cron.d/vulnbox-maintenance` (`0644 root:root`), and `/etc/sudoers.d/90-dev-admin` (`0440 root:root`):
+Deploy `/opt/admin/` scripts (`pre_backup.sh` and `status_helper.py`), `/etc/cron.d/vulnbox-maintenance`, and `/etc/sudoers.d/90-dev-admin`:
 
 ```bash
 sudo install -d -m 0755 -o root -g dev /opt/admin
@@ -208,7 +202,7 @@ Before cleaning and exporting the image, run the local verification suite inside
 sudo bash box/scripts/verify_vm.sh
 ```
 
-The script validates **31 conditions** (`31 passed, 0 failed`), including hostname, `dev` account, Netplan (`0600` without cloud-init overrides), GRUB2 `PBKDF2` + `--unrestricted`, UFW rules (`22/tcp`, `445/tcp`, `8080/tcp`), active systemd units, SSH `StrictModes` + `PubkeyAuthentication`, listening sockets (`:445`, `127.0.0.1:5000`), PHP-FPM socket presence, live `:8080` status, `?log=` traversal, `?proxy_path=` bridge to `:5000`, `visudo`, cron mode/hook permissions, live `su dev` + `sudo PYTHONPATH=... /usr/bin/python3 /opt/admin/maintenance.py` override, and `0600` ownership on both flags.
+The script validates **31 conditions**, including hostname, `dev` account, Netplan, GRUB2 `PBKDF2` + `--unrestricted`, UFW rules (`22/tcp`, `445/tcp`, `8080/tcp`), active systemd units, SSH `StrictModes` + `PubkeyAuthentication`, listening sockets (`:445`, `127.0.0.1:5000`), PHP-FPM socket presence, live `:8080` status, `?log=` traversal, `?proxy_path=` bridge to `:5000`, `visudo`, cron mode/hook permissions, live `su dev` + `sudo PYTHONPATH=... /usr/bin/python3 /opt/admin/maintenance.py` override, and ownership on both flags.
 
 After the build passes `31 passed, 0 failed`, follow [WALKTHROUGH.md](WALKTHROUGH.md) from your analyst host if you also want to verify the full external flow against the running VM.
 
@@ -221,11 +215,9 @@ After the build passes `31 passed, 0 failed`, follow [WALKTHROUGH.md](WALKTHROUG
    sudo bash box/scripts/cleanup_vm.sh
    sudo poweroff
    ```
-2. In VirtualBox, disable **Adapter 1 (NAT)** (leave **Adapter 2** on `vboxnet0` / Host-Only enabled) and detach any installation ISO image.
+2. In VirtualBox, disable **Adapter 1 (NAT)** and detach any installation ISO image.
 3. Export the appliance as **`VulnBox.ova`** (`File -> Export Appliance -> OVF 2.0`) or via CLI:
    ```bash
-   VBoxManage export "VulnBox" --output "VulnBox.ova" --ovf20 --vsys 0 \
-       --product "VulnBox Educational Appliance" \
-       --description "APNWA Project: Vulnerable Virtual Machine (Ubuntu Server 26.04.1 LTS)"
+   VBoxManage export "VulnBox" --output "VulnBox.ova" --ovf20 --vsys 0 --description "APNWA Project: Vulnerable Virtual Machine (Ubuntu Server 26.04.1 LTS)"
    ```
 4. Import `VulnBox.ova` into a clean VirtualBox profile (with MAC address reinitialization enabled) and verify every stage end-to-end using [WALKTHROUGH.md](WALKTHROUGH.md).
